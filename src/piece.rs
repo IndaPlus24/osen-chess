@@ -1,4 +1,6 @@
-use std::{fmt::Display, usize};
+use std::fmt::Display;
+
+use crate::{ChessError, Game, GameTurn};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PieceColor {
@@ -17,7 +19,17 @@ impl Display for PieceColor {
     }
 }
 
-#[derive(Debug)]
+impl From<PieceColor> for GameTurn {
+    fn from(value: PieceColor) -> Self {
+        match value {
+            PieceColor::White(_) => GameTurn::White,
+            PieceColor::Black(_) => GameTurn::Black,
+            PieceColor::Empty => todo!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum File {
     One,
     Two,
@@ -27,6 +39,24 @@ pub enum File {
     Six,
     Seven,
     Eight,
+}
+
+impl TryFrom<i8> for File {
+    type Error = ChessError;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(File::One),
+            1 => Ok(File::Two),
+            2 => Ok(File::Three),
+            3 => Ok(File::Four),
+            4 => Ok(File::Five),
+            5 => Ok(File::Six),
+            6 => Ok(File::Seven),
+            7 => Ok(File::Eight),
+            _ => Err(ChessError::OutOfBounds),
+        }
+    }
 }
 
 impl From<File> for i8 {
@@ -89,7 +119,7 @@ impl From<&File> for usize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Rank {
     A,
     B,
@@ -99,6 +129,24 @@ pub enum Rank {
     F,
     G,
     H,
+}
+
+impl TryFrom<i8> for Rank {
+    type Error = ChessError;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Rank::A),
+            1 => Ok(Rank::B),
+            2 => Ok(Rank::C),
+            3 => Ok(Rank::D),
+            4 => Ok(Rank::E),
+            5 => Ok(Rank::F),
+            6 => Ok(Rank::G),
+            7 => Ok(Rank::H),
+            _ => Err(ChessError::OutOfBounds),
+        }
+    }
 }
 
 impl From<Rank> for usize {
@@ -185,7 +233,7 @@ impl Display for Piece {
 }
 
 impl Piece {
-    pub fn get_move_set(self, pos: &(File, Rank)) -> Vec<(i8, i8)> {
+    fn get_move_set(self) -> Vec<(i8, i8)> {
         match self {
             Piece::Pawn => vec![(0, 1), (0, 2), (-1, 1), (1, 1)],
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
