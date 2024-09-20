@@ -210,17 +210,62 @@ impl Piece {
                 (-1, 1),
             ],
         }
-        // let len = match self {
-        //     Piece::Pawn => PieceLen::Two,
-        //     Piece::Knight => PieceLen::One,
-        //     Piece::Bishop | Piece::Rook | Piece::Queen => PieceLen::Infinity,
-        //     Piece::King => PieceLen::One,
-        // };
+    }
+
+    pub fn get_possible_moves(self, game: &Game, pos: &(File, Rank)) -> Vec<(File, Rank)> {
+        let len = match self {
+            Piece::Pawn => PieceLen::Two,
+            Piece::Knight => PieceLen::One,
+            Piece::Bishop | Piece::Rook | Piece::Queen => PieceLen::Infinity,
+            Piece::King => PieceLen::One,
+        };
+
+        let move_dirs = self.get_move_set();
+
+        let moves: Vec<(File, Rank)> = move_dirs
+            .into_iter()
+            .map(|dir| add_along_dir(dir, pos, &len))
+            .map(|list| {
+                list.into_iter()
+                    .map_while(|pos| match game.board.get_piece_at(&pos) {
+                        PieceColor::White(_) => match game.turn {
+                            GameTurn::White => None,
+                            GameTurn::Black => Some(pos),
+                        },
+                        PieceColor::Black(_) => match game.turn {
+                            GameTurn::White => Some(pos),
+                            GameTurn::Black => None,
+                        },
+                        PieceColor::Empty => Some(pos),
+                    })
+                    .collect::<Vec<(File, Rank)>>()
+            })
+            .collect::<Vec<Vec<(File, Rank)>>>()
+            .concat();
+
+        moves
     }
 }
 
-fn offset_vec_pos(vec: (i8, i8), offset: (i8, i8)) -> (i8, i8) {
-    (vec.0 * offset.0, vec.1 * offset.1)
+fn add_along_dir(dir: (i8, i8), pos: &(File, Rank), len: &PieceLen) -> Vec<(File, Rank)> {
+    let len: i8 = match len {
+        PieceLen::One => 1,
+        PieceLen::Two => 2,
+        PieceLen::Infinity => 8,
+    };
+    let (p_x, p_y) = (i8::from(pos.0), i8::from(pos.1));
+
+    let (x, y) = dir;
+
+    (0..len)
+        .map(|i| (x * i, y * i))
+        .map_while(|(x, y)| {
+            Some((
+                p_x.checked_add(x)?.try_into().ok()?,
+                p_y.checked_add(y)?.try_into().ok()?,
+            ))
+        })
+        .collect()
 }
 
 #[derive(Debug)]

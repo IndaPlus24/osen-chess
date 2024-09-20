@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::usize;
 
 use crate::piece::File;
 use crate::piece::Piece::*;
