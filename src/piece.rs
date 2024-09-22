@@ -9,6 +9,17 @@ pub enum PieceColor {
     Empty,
 }
 
+impl PieceColor {
+    pub fn set_piece(&mut self, piece: Piece) -> Result<(), ChessError> {
+        match self {
+            PieceColor::White(p) => *p = piece,
+            PieceColor::Black(p) => *p = piece,
+            PieceColor::Empty => return Err(ChessError::DeSyncedTurnColor),
+        };
+        Ok(())
+    }
+}
+
 impl Display for PieceColor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -209,9 +220,12 @@ impl From<&Rank> for i8 {
     }
 }
 
+/// To indicate if move is its first
+pub type IsFirstMove = bool;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Piece {
-    Pawn,
+    Pawn(IsFirstMove),
     Rook,
     Knight,
     Bishop,
@@ -222,7 +236,10 @@ pub enum Piece {
 impl Display for Piece {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Piece::Pawn => write!(f, "P"),
+            Piece::Pawn(first) => match first {
+                true => write!(f, "P"),
+                false => write!(f, "p"),
+            },
             Piece::Rook => write!(f, "R"),
             Piece::Knight => write!(f, "k"),
             Piece::Bishop => write!(f, "B"),
@@ -235,7 +252,10 @@ impl Display for Piece {
 impl Piece {
     fn get_move_set(self) -> Vec<(i8, i8)> {
         match self {
-            Piece::Pawn => vec![(0, 1), (0, 2), (-1, 1), (1, 1)],
+            Piece::Pawn(first_move) => match first_move {
+                true => vec![(0, 1), (0, 2), (-1, 1), (1, 1)],
+                false => vec![(0, 1), (-1, 1), (1, 1)],
+            },
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
             Piece::Knight => vec![
                 (1, 2),
@@ -262,7 +282,10 @@ impl Piece {
 
     pub fn get_possible_moves(self, game: &Game, pos: &(File, Rank)) -> Vec<(File, Rank)> {
         let len = match self {
-            Piece::Pawn => PieceLen::Two,
+            Piece::Pawn(first_move) => match first_move {
+                true => PieceLen::Two,
+                false => PieceLen::One,
+            },
             Piece::Knight => PieceLen::One,
             Piece::Bishop | Piece::Rook | Piece::Queen => PieceLen::Infinity,
             Piece::King => PieceLen::One,

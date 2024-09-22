@@ -4,6 +4,8 @@ use crate::piece::File;
 use crate::piece::Piece::*;
 use crate::piece::PieceColor;
 use crate::piece::Rank;
+use crate::GameState;
+use crate::GameTurn;
 
 #[derive(Debug)]
 pub struct Board {
@@ -20,10 +22,26 @@ impl Board {
         let (f, r) = pos;
         self.data[usize::from(f)][usize::from(r)] = piece_color;
     }
+
+    pub fn check_promotion(&self, pos: &(File, Rank), turn: &GameTurn) -> GameState {
+        match turn {
+            GameTurn::White => {
+                if pos.0 == File::Eight {
+                    return GameState::Promotion(*pos);
+                }
+            }
+            GameTurn::Black => {
+                if pos.0 == File::One {
+                    return GameState::Promotion(*pos);
+                }
+            }
+        }
+        GameState::InProgress
+    }
 }
 
 impl Display for Board {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = String::new();
         for file in self.data {
             for rank in file {
@@ -49,12 +67,12 @@ impl Default for Board {
             PieceColor::Black(Rook),
         )
             .into();
-        data[1] = [PieceColor::Black(Pawn); 8];
+        data[1] = [PieceColor::Black(Pawn(true)); 8];
         data[2] = [PieceColor::Empty; 8];
         data[3] = [PieceColor::Empty; 8];
         data[4] = [PieceColor::Empty; 8];
         data[5] = [PieceColor::Empty; 8];
-        data[6] = [PieceColor::White(Pawn); 8];
+        data[6] = [PieceColor::White(Pawn(true)); 8];
         data[7] = (
             PieceColor::White(Rook),
             PieceColor::White(Knight),

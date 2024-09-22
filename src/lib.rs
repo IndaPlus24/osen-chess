@@ -1,7 +1,7 @@
 mod board;
 mod piece;
 
-use piece::PieceColor;
+use piece::{Piece, PieceColor};
 
 use crate::{
     board::Board,
@@ -10,14 +10,18 @@ use crate::{
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum GameState {
+    /// Game in progress
     InProgress,
-    Promotion,
+    /// Waits for promotion of piece
+    Promotion((File, Rank)),
+    /// Board in check
     Check,
-    CheckMate,
+    /// Game over
     GameOver,
 }
 
-#[derive(Debug)]
+/// Game turn
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameTurn {
     White,
     Black,
@@ -25,10 +29,16 @@ pub enum GameTurn {
 
 #[derive(Debug)]
 pub enum ChessError {
+    /// Moved to a unreachable position
     InvalidMove,
+    /// Turn desynced from Game struct
     DeSyncedTurnColor,
+    /// Position out of bounds on board
     OutOfBounds,
+    /// Selecting a empty space
     EmptySpace,
+    /// Funktion called in wrong game state
+    InvalidGameState,
 }
 
 pub struct Game {
@@ -70,23 +80,51 @@ impl Game {
             },
             GameTurn::Black => match piece_color {
                 piece::PieceColor::Black(p) => p,
-                piece::PieceColor::White(_) => {
-                    return Err(ChessError::DeSyncedTurnColor)
-                },
+                piece::PieceColor::White(_) => return Err(ChessError::DeSyncedTurnColor),
                 piece::PieceColor::Empty => return Err(ChessError::EmptySpace),
             },
         };
 
         let moves = piece.get_possible_moves(self, &from);
         if moves.contains(&to) {
+            // Move piece
             self.board.set_piece_at(&to, piece_color);
             self.board.set_piece_at(&from, PieceColor::Empty);
 
-            // Check if in check
             // Check for promotion
+            let mut state = self.board.check_promotion(&to, &self.turn);
 
+            // Check if in check
+            state = match moves
+                .iter()
+                .map(|pos| self.board.get_piece_at(pos))
+                .filter_map(|p| match p {
+                    PieceColor::White(piece) => match self.turn {
+                        GameTurn::White => None,
+                        GameTurn::Black => match piece {
+                            piece::Piece::King => Some(piece),
+                            _ => None,
+                        },
+                    },
+                    PieceColor::Black(piece) => match self.turn {
+                        GameTurn::White => match piece {
+                            piece::Piece::King => Some(piece),
+                            _ => None,
+                        },
+                        GameTurn::Black => None,
+                    },
+                    PieceColor::Empty => None,
+                })
+                .next()
+                .is_some()
+            {
+                true => GameState::Check,
+                false => state,
+            };
+
+            // Switch turn
             self.next_turn();
-            return Ok(GameState::InProgress);
+            return Ok(state);
         }
 
         Err(ChessError::InvalidMove)
@@ -99,19 +137,33 @@ impl Game {
         }
     }
 
-    /// Set the piece type that a peasant becames following a promotion.
-    pub fn set_promotion(&mut self, piece: (File, Rank)) {
-        todo!();
+    pub fn get_turn(&self) -> GameTurn {
+        self.turn
+    }
+
+    /// Set the piece type that a pawn becames following a promotion.
+    pub fn set_promotion(&mut self, piece: Piece) -> Result<(), ChessError> {
+        let pos = match self.state {
+            GameState::Promotion(pos) => pos,
+            _ => return Err(ChessError::InvalidGameState),
+        };
+
+        let mut piece_color = self.board.get_piece_at(&pos);
+        piece_color.set_piece(piece)?;
+
+        self.board.set_piece_at(&pos, piece_color);
+
+        Ok(())
     }
 
     /// If a piece is standing on the given tile, return all possible
-    /// new positions of that piece. Don't forget to the rules for check.
-    pub fn get_possible_moves(&self, postion: (File, Rank)) -> Result<Vec<(File, Rank)>, ChessError> {
+    /// new positions of that piece. Or None if empty space
+    pub fn get_possible_moves(&self, postion: (File, Rank)) -> Option<Vec<(File, Rank)>> {
         match self.board.get_piece_at(&postion) {
             PieceColor::White(piece) | PieceColor::Black(piece) => {
-                Ok(piece.get_possible_moves(self, &postion))
-            },
-            PieceColor::Empty => Err(ChessError::EmptySpace),
+                Some(piece.get_possible_moves(self, &postion))
+            }
+            PieceColor::Empty => None,
         }
     }
 }
