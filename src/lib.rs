@@ -1,6 +1,8 @@
 mod board;
 mod piece;
 
+use std::ops::Not;
+
 use piece::{Piece, PieceColor};
 
 use crate::{
@@ -20,11 +22,37 @@ pub enum GameState {
     GameOver,
 }
 
+#[derive(Debug, Copy, Clone)]
+struct KingPos {
+    white: (File, Rank),
+    black: (File, Rank),
+}
+
+impl Default for KingPos {
+    fn default() -> Self {
+        Self {
+            white: (File::One, Rank::E),
+            black: (File::Eight, Rank::E),
+        }
+    }
+}
+
 /// Game turn
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameTurn {
     White,
     Black,
+}
+
+impl Not for GameTurn {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            GameTurn::White => GameTurn::Black,
+            GameTurn::Black => GameTurn::White,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -45,6 +73,7 @@ pub struct Game {
     state: GameState,
     turn: GameTurn,
     board: Board,
+    king_pos: KingPos,
 }
 
 impl Default for Game {
@@ -61,6 +90,7 @@ impl Game {
             state: GameState::InProgress,
             turn: GameTurn::White,
             board: Board::default(),
+            king_pos: KingPos::default(),
         }
     }
 
@@ -74,67 +104,95 @@ impl Game {
         let piece_color = self.board.get_piece_at(&from);
         let piece = match self.turn {
             GameTurn::White => match piece_color {
-                piece::PieceColor::White(p) => p,
-                piece::PieceColor::Black(_) => return Err(ChessError::DeSyncedTurnColor),
-                piece::PieceColor::Empty => return Err(ChessError::EmptySpace),
+                PieceColor::White(p) => p,
+                PieceColor::Black(_) => return Err(ChessError::DeSyncedTurnColor),
+                PieceColor::Empty => return Err(ChessError::EmptySpace),
             },
             GameTurn::Black => match piece_color {
-                piece::PieceColor::Black(p) => p,
-                piece::PieceColor::White(_) => return Err(ChessError::DeSyncedTurnColor),
-                piece::PieceColor::Empty => return Err(ChessError::EmptySpace),
+                PieceColor::Black(p) => p,
+                PieceColor::White(_) => return Err(ChessError::DeSyncedTurnColor),
+                PieceColor::Empty => return Err(ChessError::EmptySpace),
             },
         };
 
-        let moves = piece.get_possible_moves(self, &from);
+        let moves = piece.get_possible_moves(&self.board, &self.turn, &from);
         if moves.contains(&to) {
+            // Test move piece
+            let mut test_board = self.board.clone();
+            test_board.set_piece_at(&to, piece_color);
+            test_board.set_piece_at(&from, PieceColor::Empty);
+
+            let mut king_pos = self.king_pos;
+
+            // if king moves update king pos
+            if piece == Piece::King {
+                match self.turn {
+                    GameTurn::White => king_pos.white = to,
+                    GameTurn::Black => king_pos.black = to,
+                }
+            }
+
+            let king_pos = match self.turn {
+                GameTurn::White => king_pos.white,
+                GameTurn::Black => king_pos.black,
+            };
+
+            // Test for check
+            if self.is_check(&test_board, &self.turn, &king_pos) {
+                return Err(ChessError::InvalidMove);
+            }
+
             // Move piece
             self.board.set_piece_at(&to, piece_color);
             self.board.set_piece_at(&from, PieceColor::Empty);
 
             // Check for promotion
-            let mut state = self.board.check_promotion(&to, &self.turn);
+            let state = self.board.check_promotion(&to, &self.turn);
+            // if promotion; return early to promote
+            if let GameState::Promotion(pos) = state {
+                return Ok(GameState::Promotion(pos));
+            }
 
             // Check if in check
-            state = match moves
-                .iter()
-                .map(|pos| self.board.get_piece_at(pos))
-                .filter_map(|p| match p {
-                    PieceColor::White(piece) => match self.turn {
-                        GameTurn::White => None,
-                        GameTurn::Black => match piece {
-                            piece::Piece::King => Some(piece),
-                            _ => None,
-                        },
-                    },
-                    PieceColor::Black(piece) => match self.turn {
-                        GameTurn::White => match piece {
-                            piece::Piece::King => Some(piece),
-                            _ => None,
-                        },
-                        GameTurn::Black => None,
-                    },
-                    PieceColor::Empty => None,
-                })
-                .next()
-                .is_some()
-            {
-                true => GameState::Check,
-                false => state,
+            let king_pos = match self.turn {
+                GameTurn::White => self.king_pos.black,
+                GameTurn::Black => self.king_pos.white,
             };
+            if self.is_check(&test_board, &!self.turn, &king_pos) {
+                self.next_turn();
+                return Ok(GameState::Check);
+            }
 
             // Switch turn
             self.next_turn();
-            return Ok(state);
+            return Ok(GameState::InProgress);
         }
 
         Err(ChessError::InvalidMove)
     }
 
+    fn is_check(&self, board: &Board, turn: &GameTurn, king_pos: &(File, Rank)) -> bool {
+        Piece::Queen
+            .get_possible_moves(&self.board, turn, king_pos)
+            .into_iter()
+            .map(|pos| (board.get_piece_at(&pos), pos))
+            .filter_map(|(p, pos)| match p {
+                PieceColor::White(piece) => match turn {
+                    GameTurn::White => None,
+                    GameTurn::Black => Some((piece, pos)),
+                },
+                PieceColor::Black(piece) => match turn {
+                    GameTurn::White => Some((piece, pos)),
+                    GameTurn::Black => None,
+                },
+                PieceColor::Empty => None,
+            })
+            .map(|(p, pos)| p.get_possible_moves(&self.board, turn, &pos))
+            .any(|m| m.contains(king_pos))
+    }
+
     fn next_turn(&mut self) {
-        match self.turn {
-            GameTurn::White => self.turn = GameTurn::Black,
-            GameTurn::Black => self.turn = GameTurn::White,
-        }
+        self.turn = !self.turn
     }
 
     pub fn get_turn(&self) -> GameTurn {
@@ -161,7 +219,7 @@ impl Game {
     pub fn get_possible_moves(&self, postion: (File, Rank)) -> Option<Vec<(File, Rank)>> {
         match self.board.get_piece_at(&postion) {
             PieceColor::White(piece) | PieceColor::Black(piece) => {
-                Some(piece.get_possible_moves(self, &postion))
+                Some(piece.get_possible_moves(&self.board, &self.turn, &postion))
             }
             PieceColor::Empty => None,
         }

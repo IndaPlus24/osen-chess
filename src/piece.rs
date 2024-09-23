@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{ChessError, Game, GameTurn};
+use crate::{board::Board, ChessError, GameTurn};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PieceColor {
@@ -40,7 +40,7 @@ impl From<PieceColor> for GameTurn {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum File {
     One,
     Two,
@@ -130,7 +130,7 @@ impl From<&File> for usize {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum Rank {
     A,
     B,
@@ -280,7 +280,7 @@ impl Piece {
         }
     }
 
-    pub fn get_possible_moves(self, game: &Game, pos: &(File, Rank)) -> Vec<(File, Rank)> {
+    pub fn get_possible_moves(self, board: &Board, turn: &GameTurn, pos: &(File, Rank)) -> Vec<(File, Rank)> {
         let len = match self {
             Piece::Pawn(first_move) => match first_move {
                 true => PieceLen::Two,
@@ -298,12 +298,12 @@ impl Piece {
             .map(|dir| add_along_dir(dir, pos, &len))
             .map(|list| {
                 list.into_iter()
-                    .map_while(|pos| match game.board.get_piece_at(&pos) {
-                        PieceColor::White(_) => match game.turn {
+                    .map_while(|pos| match board.get_piece_at(&pos) {
+                        PieceColor::White(_) => match turn {
                             GameTurn::White => None,
                             GameTurn::Black => Some(pos),
                         },
-                        PieceColor::Black(_) => match game.turn {
+                        PieceColor::Black(_) => match turn {
                             GameTurn::White => Some(pos),
                             GameTurn::Black => None,
                         },
