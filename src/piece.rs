@@ -253,8 +253,8 @@ impl Piece {
     fn get_move_set(self) -> Vec<(i8, i8)> {
         match self {
             Piece::Pawn(first_move) => match first_move {
-                true => vec![(0, 1), (0, 2), (-1, 1), (1, 1)],
-                false => vec![(0, 1), (-1, 1), (1, 1)],
+                true => vec![(-1, 1), (1, 1), (0, 1), (0, 2)],
+                false => vec![(-1, 1), (1, 1), (0, 1)],
             },
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
             Piece::Knight => vec![
@@ -280,7 +280,12 @@ impl Piece {
         }
     }
 
-    pub fn get_possible_moves(self, board: &Board, turn: &GameTurn, pos: &(File, Rank)) -> Vec<(File, Rank)> {
+    pub fn get_possible_moves(
+        self,
+        board: &Board,
+        turn: &GameTurn,
+        pos: &(File, Rank),
+    ) -> Vec<(File, Rank)> {
         let len = match self {
             Piece::Pawn(first_move) => match first_move {
                 true => PieceLen::Two,
@@ -293,32 +298,94 @@ impl Piece {
 
         let move_dirs = self.get_move_set();
 
-        let moves: Vec<(File, Rank)> = move_dirs
-            .into_iter()
-            .map(|dir| add_along_dir(dir, pos, &len))
+        if let Piece::Pawn(_) = self {
+            let mut moves = vec![];
+            let mut move_dirs = move_dirs.into_iter();
+
+            let cap_dir = move_dirs.next().unwrap();
+            let cap_pos = add_along_dir(&cap_dir, pos, &len);
+            let (piece, p) = cap_pos
+                .into_iter()
+                .map(|p| (board.get_piece_at(&p), p))
+                .next()
+                .unwrap();
+            match piece {
+                PieceColor::White(_) => match turn {
+                    GameTurn::White => (),
+                    GameTurn::Black => moves.push(p),
+                },
+                PieceColor::Black(_) => match turn {
+                    GameTurn::White => moves.push(p),
+                    GameTurn::Black => (),
+                },
+                PieceColor::Empty => (),
+            };
+
+            let cap_dir = move_dirs.next().unwrap();
+            let cap_pos = add_along_dir(&cap_dir, pos, &len);
+            let (piece, p) = cap_pos
+                .into_iter()
+                .map(|p| (board.get_piece_at(&p), p))
+                .next()
+                .unwrap();
+            match piece {
+                PieceColor::White(_) => match turn {
+                    GameTurn::White => (),
+                    GameTurn::Black => moves.push(p),
+                },
+                PieceColor::Black(_) => match turn {
+                    GameTurn::White => moves.push(p),
+                    GameTurn::Black => (),
+                },
+                PieceColor::Empty => (),
+            };
+
+            return self.collect_along_dirs(board, turn, move_dirs, pos, &len);
+        }
+
+        self.collect_along_dirs(board, turn, move_dirs.into_iter(), pos, &len)
+    }
+
+    fn collect_along_dirs(
+        &self,
+        board: &Board,
+        turn: &GameTurn,
+        move_dirs: std::vec::IntoIter<(i8, i8)>,
+        pos: &(File, Rank),
+        len: &PieceLen,
+    ) -> Vec<(File, Rank)> {
+        move_dirs
+            .map(|dir| add_along_dir(&dir, pos, len))
             .map(|list| {
                 list.into_iter()
-                    .map_while(|pos| match board.get_piece_at(&pos) {
-                        PieceColor::White(_) => match turn {
-                            GameTurn::White => None,
-                            GameTurn::Black => Some(pos),
-                        },
-                        PieceColor::Black(_) => match turn {
-                            GameTurn::White => Some(pos),
-                            GameTurn::Black => None,
-                        },
-                        PieceColor::Empty => Some(pos),
-                    })
+                    .map_while(|dir_pos| self.match_along_dir(board, turn, dir_pos))
                     .collect::<Vec<(File, Rank)>>()
             })
             .collect::<Vec<Vec<(File, Rank)>>>()
-            .concat();
+            .concat()
+    }
 
-        moves
+    fn match_along_dir(
+        &self,
+        board: &Board,
+        turn: &GameTurn,
+        dir_pos: (File, Rank),
+    ) -> Option<(File, Rank)> {
+        match board.get_piece_at(&dir_pos) {
+            PieceColor::White(_) => match turn {
+                GameTurn::White => None,
+                GameTurn::Black => Some(dir_pos),
+            },
+            PieceColor::Black(_) => match turn {
+                GameTurn::White => Some(dir_pos),
+                GameTurn::Black => None,
+            },
+            PieceColor::Empty => Some(dir_pos),
+        }
     }
 }
 
-fn add_along_dir(dir: (i8, i8), pos: &(File, Rank), len: &PieceLen) -> Vec<(File, Rank)> {
+fn add_along_dir(dir: &(i8, i8), pos: &(File, Rank), len: &PieceLen) -> Vec<(File, Rank)> {
     let len: i8 = match len {
         PieceLen::One => 1,
         PieceLen::Two => 2,
