@@ -40,7 +40,7 @@ impl From<PieceColor> for GameTurn {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum File {
     One,
     Two,
@@ -70,7 +70,25 @@ impl TryFrom<i8> for File {
     }
 }
 
-impl From<File> for i8 {
+impl TryFrom<u8> for File {
+    type Error = ChessError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            7 => Ok(File::One),
+            6 => Ok(File::Two),
+            5 => Ok(File::Three),
+            4 => Ok(File::Four),
+            3 => Ok(File::Five),
+            2 => Ok(File::Six),
+            1 => Ok(File::Seven),
+            0 => Ok(File::Eight),
+            _ => Err(ChessError::OutOfBounds),
+        }
+    }
+}
+
+impl From<File> for u8 {
     fn from(value: File) -> Self {
         match value {
             File::One => 7,
@@ -85,52 +103,7 @@ impl From<File> for i8 {
     }
 }
 
-impl From<&File> for i8 {
-    fn from(value: &File) -> Self {
-        match value {
-            File::One => 7,
-            File::Two => 6,
-            File::Three => 5,
-            File::Four => 4,
-            File::Five => 3,
-            File::Six => 2,
-            File::Seven => 1,
-            File::Eight => 0,
-        }
-    }
-}
-
-impl From<File> for usize {
-    fn from(val: File) -> Self {
-        match val {
-            File::One => 7,
-            File::Two => 6,
-            File::Three => 5,
-            File::Four => 4,
-            File::Five => 3,
-            File::Six => 2,
-            File::Seven => 1,
-            File::Eight => 0,
-        }
-    }
-}
-
-impl From<&File> for usize {
-    fn from(val: &File) -> Self {
-        match val {
-            File::One => 7,
-            File::Two => 6,
-            File::Three => 5,
-            File::Four => 4,
-            File::Five => 3,
-            File::Six => 2,
-            File::Seven => 1,
-            File::Eight => 0,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Eq)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum Rank {
     A,
     B,
@@ -146,6 +119,24 @@ impl TryFrom<i8> for Rank {
     type Error = ChessError;
 
     fn try_from(value: i8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Rank::A),
+            1 => Ok(Rank::B),
+            2 => Ok(Rank::C),
+            3 => Ok(Rank::D),
+            4 => Ok(Rank::E),
+            5 => Ok(Rank::F),
+            6 => Ok(Rank::G),
+            7 => Ok(Rank::H),
+            _ => Err(ChessError::OutOfBounds),
+        }
+    }
+}
+
+impl TryFrom<u8> for Rank {
+    type Error = ChessError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Rank::A),
             1 => Ok(Rank::B),
@@ -177,6 +168,21 @@ impl From<Rank> for usize {
 
 impl From<&Rank> for usize {
     fn from(val: &Rank) -> Self {
+        match val {
+            Rank::A => 0,
+            Rank::B => 1,
+            Rank::C => 2,
+            Rank::D => 3,
+            Rank::E => 4,
+            Rank::F => 5,
+            Rank::G => 6,
+            Rank::H => 7,
+        }
+    }
+}
+
+impl From<Rank> for u8 {
+    fn from(val: Rank) -> Self {
         match val {
             Rank::A => 0,
             Rank::B => 1,
@@ -253,18 +259,19 @@ impl Piece {
     fn get_move_set(self) -> Vec<(i8, i8)> {
         match self {
             Piece::Pawn(first_move) => match first_move {
-                true => vec![(-1, 1), (1, 1), (0, 1), (0, 2)],
-                false => vec![(-1, 1), (1, 1), (0, 1)],
+                true => vec![(-1, -1), (1, -1), (0, -1), (0, -2)],
+                false => vec![(-1, -1), (1, -1), (0, -1)],
             },
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
             Piece::Knight => vec![
-                (1, 2),
-                (2, -1),
-                (1, -2),
                 (-1, -2),
-                (-2, -1),
-                (-2, 1),
+                (1, -2),
+                (2, -1),
+                (2, 1),
+                (1, 2),
                 (-1, 2),
+                (-2, 1),
+                (-2, -1),
             ],
             Piece::Bishop => vec![(1, 1), (-1, -1), (1, -1), (-1, 1)],
             Piece::King | Piece::Queen => vec![
@@ -284,13 +291,10 @@ impl Piece {
         self,
         board: &Board,
         turn: &GameTurn,
-        pos: &(File, Rank),
-    ) -> Vec<(File, Rank)> {
+        pos: &(u8, u8),
+    ) -> Vec<(u8, u8)> {
         let len = match self {
-            Piece::Pawn(first_move) => match first_move {
-                true => PieceLen::Two,
-                false => PieceLen::One,
-            },
+            Piece::Pawn(_) => PieceLen::One,
             Piece::Knight => PieceLen::One,
             Piece::Bishop | Piece::Rook | Piece::Queen => PieceLen::Infinity,
             Piece::King => PieceLen::One,
@@ -302,43 +306,14 @@ impl Piece {
             let mut moves = vec![];
             let mut move_dirs = move_dirs.into_iter();
 
-            let cap_dir = move_dirs.next().unwrap();
-            let cap_pos = add_along_dir(&cap_dir, pos, &len);
-            let (piece, p) = cap_pos
-                .into_iter()
-                .map(|p| (board.get_piece_at(&p), p))
-                .next()
-                .unwrap();
-            match piece {
-                PieceColor::White(_) => match turn {
-                    GameTurn::White => (),
-                    GameTurn::Black => moves.push(p),
-                },
-                PieceColor::Black(_) => match turn {
-                    GameTurn::White => moves.push(p),
-                    GameTurn::Black => (),
-                },
-                PieceColor::Empty => (),
-            };
-
-            let cap_dir = move_dirs.next().unwrap();
-            let cap_pos = add_along_dir(&cap_dir, pos, &len);
-            let (piece, p) = cap_pos
-                .into_iter()
-                .map(|p| (board.get_piece_at(&p), p))
-                .next()
-                .unwrap();
-            match piece {
-                PieceColor::White(_) => match turn {
-                    GameTurn::White => (),
-                    GameTurn::Black => moves.push(p),
-                },
-                PieceColor::Black(_) => match turn {
-                    GameTurn::White => moves.push(p),
-                    GameTurn::Black => (),
-                },
-                PieceColor::Empty => (),
-            };
+            let dir = move_dirs.next().unwrap();
+            if let Some(p) = check_pawn_cap_move(pos, &len, &dir, board, turn) {
+                moves.push(p);
+            }
+            let dir = move_dirs.next().unwrap();
+            if let Some(p) = check_pawn_cap_move(pos, &len, &dir, board, turn) {
+                moves.push(p);
+            }
 
             return self.collect_along_dirs(board, turn, move_dirs, pos, &len);
         }
@@ -346,31 +321,40 @@ impl Piece {
         self.collect_along_dirs(board, turn, move_dirs.into_iter(), pos, &len)
     }
 
-    fn collect_along_dirs(
+    pub(crate) fn collect_along_dirs(
         &self,
         board: &Board,
         turn: &GameTurn,
         move_dirs: std::vec::IntoIter<(i8, i8)>,
-        pos: &(File, Rank),
+        pos: &(u8, u8),
         len: &PieceLen,
-    ) -> Vec<(File, Rank)> {
-        move_dirs
-            .map(|dir| add_along_dir(&dir, pos, len))
+    ) -> Vec<(u8, u8)> {
+        let moves = move_dirs.map(|dir| add_along_dir(&dir, pos, len));
+        println!("{moves:?}");
+
+        moves
             .map(|list| {
-                list.into_iter()
-                    .map_while(|dir_pos| self.match_along_dir(board, turn, dir_pos))
-                    .collect::<Vec<(File, Rank)>>()
+                let res = list
+                    .into_iter()
+                    .map_while(|dir_pos| {
+                        let moves = self.match_along_dir(board, turn, dir_pos);
+                        println!("{moves:?}");
+                        moves
+                    })
+                    .collect::<Vec<(u8, u8)>>();
+                println!("{res:?}");
+                res
             })
-            .collect::<Vec<Vec<(File, Rank)>>>()
+            .collect::<Vec<Vec<(u8, u8)>>>()
             .concat()
     }
 
-    fn match_along_dir(
+    pub(crate) fn match_along_dir(
         &self,
         board: &Board,
         turn: &GameTurn,
-        dir_pos: (File, Rank),
-    ) -> Option<(File, Rank)> {
+        dir_pos: (u8, u8),
+    ) -> Option<(u8, u8)> {
         match board.get_piece_at(&dir_pos) {
             PieceColor::White(_) => match turn {
                 GameTurn::White => None,
@@ -385,30 +369,174 @@ impl Piece {
     }
 }
 
-fn add_along_dir(dir: &(i8, i8), pos: &(File, Rank), len: &PieceLen) -> Vec<(File, Rank)> {
+pub(crate) fn check_pawn_cap_move(
+    pos: &(u8, u8),
+    len: &PieceLen,
+    dir: &(i8, i8),
+    board: &Board,
+    turn: &GameTurn,
+) -> Option<(u8, u8)> {
+    let dir = add_along_dir(&dir, pos, len);
+    let cap_pos = dir.first()?;
+    let board_pos = board.get_piece_at(cap_pos);
+    match board_pos {
+        PieceColor::White(_) => match turn {
+            GameTurn::White => None,
+            GameTurn::Black => Some(*cap_pos),
+        },
+        PieceColor::Black(_) => match turn {
+            GameTurn::White => Some(*cap_pos),
+            GameTurn::Black => None,
+        },
+        PieceColor::Empty => None,
+    }
+}
+
+fn add_along_dir(dir: &(i8, i8), pos: &(u8, u8), len: &PieceLen) -> Vec<(u8, u8)> {
     let len: i8 = match len {
         PieceLen::One => 1,
-        PieceLen::Two => 2,
+        // PieceLen::Two => 2,
         PieceLen::Infinity => 8,
     };
-    let (p_x, p_y) = (i8::from(pos.0), i8::from(pos.1));
+    let (p_x, p_y) = pos;
+    // println!("pos: {:?}", (p_x, p_y));
 
     let (x, y) = dir;
+    println!("dir: {:?}", (x, y));
 
-    (0..len)
+    (1..=len)
         .map(|i| (x * i, y * i))
         .map_while(|(x, y)| {
-            Some((
-                p_x.checked_add(x)?.try_into().ok()?,
-                p_y.checked_add(y)?.try_into().ok()?,
-            ))
+            let r: i8 = *p_x as i8 + x;
+            let f: i8 = *p_y as i8 + y;
+
+            if r >= 8 || f >= 8 {
+                return None;
+            }
+
+            println!("{:?}", (r, f));
+            Some((r.try_into().ok()?, f.try_into().ok()?))
         })
         .collect()
 }
 
 #[derive(Debug)]
-enum PieceLen {
+pub(crate) enum PieceLen {
     One,
-    Two,
+    // Two,
     Infinity,
+}
+
+#[cfg(test)]
+mod piece_test {
+    use crate::board::Board;
+    use crate::piece::PieceLen;
+    use crate::Game;
+    use crate::GameTurn;
+
+    use super::add_along_dir;
+    use super::Piece;
+    use super::PieceColor;
+
+    #[test]
+    fn add_along_dir_test_down() {
+        let dir = add_along_dir(&(0, 1), &(0, 2), &PieceLen::Infinity);
+        println!("{dir:?}");
+        assert_eq!(dir, vec![(0, 3), (0, 4), (0, 5), (0, 6), (0, 7),])
+    }
+
+    #[test]
+    fn add_along_dir_test_up() {
+        let dir = add_along_dir(&(0, -1), &(0, 3), &PieceLen::Infinity);
+        println!("{dir:?}");
+        assert_eq!(dir, vec![(0, 2), (0, 1), (0, 0)])
+    }
+
+    #[test]
+    fn add_along_dir_test_left() {
+        let dir = add_along_dir(&(-1, 0), &(3, 0), &PieceLen::Infinity);
+        println!("{dir:?}");
+        assert_eq!(dir, vec![(2, 0), (1, 0), (0, 0)])
+    }
+
+    #[test]
+    fn add_along_dir_test_right() {
+        let dir = add_along_dir(&(1, 0), &(3, 0), &PieceLen::Infinity);
+        println!("{dir:?}");
+        assert_eq!(dir, vec![(4, 0), (5, 0), (6, 0), (7, 0)])
+    }
+
+    #[test]
+    fn match_along_dir_test() {
+        let mut board = Board::new(None);
+        board.set_piece_at(&(6, 7), PieceColor::White(Piece::Knight));
+        board.set_piece_at(&(5, 5), PieceColor::Black(Piece::Queen));
+        let dir_pos = (5, 5);
+        let piece = board.get_piece_at(&(6, 7));
+        if let PieceColor::White(p) = piece {
+            let res = p.match_along_dir(&board, &GameTurn::White, dir_pos);
+            println!("{res:?}");
+            assert_eq!(res, Some(dir_pos))
+        };
+    }
+
+    #[test]
+    fn collect_along_dirs_test_knight() {
+        let game = Game::default();
+        let pos = (6, 7);
+        let piece = game.board.get_piece_at(&pos);
+        if let PieceColor::White(piece) = piece {
+            println!("{piece:?} at {pos:?}");
+            let moves = piece.collect_along_dirs(
+                &game.board,
+                &GameTurn::White,
+                piece.get_move_set().into_iter(),
+                &pos,
+                &PieceLen::One,
+            );
+            println!("{moves:?}");
+            assert_eq!(moves, vec![(5, 5), (7, 5)])
+        }
+    }
+
+    #[test]
+    fn collect_along_dirs_test_pawn_first_move() {
+        let game = Game::default();
+        let pos = (6, 6);
+        let piece = game.board.get_piece_at(&pos);
+        if let PieceColor::White(piece) = piece {
+            println!("{piece:?} at {pos:?}");
+            let moves = piece.collect_along_dirs(
+                &game.board,
+                &GameTurn::White,
+                piece.get_move_set().into_iter(),
+                &pos,
+                &PieceLen::One,
+            );
+            println!("{moves:?}");
+            assert_eq!(moves, vec![(5, 5), (7, 5), (6, 5), (6, 4)])
+        }
+    }
+
+    #[test]
+    fn collect_along_dirs_test_pawn() {
+        let mut game = Game::default();
+        game.board.set_piece_at(&(6, 6), PieceColor::Empty);
+        let pos = (6, 5);
+        game.board
+            .set_piece_at(&pos, PieceColor::White(Piece::Pawn(false)));
+        let piece = game.board.get_piece_at(&pos);
+        if let PieceColor::White(piece) = piece {
+            println!("{piece:?} at {pos:?}");
+            let moves = piece.collect_along_dirs(
+                &game.board,
+                &GameTurn::White,
+                piece.get_move_set().into_iter(),
+                &pos,
+                &PieceLen::One,
+            );
+            println!("{moves:?}");
+            assert_eq!(moves, vec![(5, 4), (7, 4), (6, 4)])
+        }
+    }
 }

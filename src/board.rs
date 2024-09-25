@@ -1,53 +1,70 @@
 use std::fmt::Display;
 
 use crate::piece::File;
-use crate::piece::Piece::*;
+use crate::piece::Piece;
 use crate::piece::PieceColor;
 use crate::piece::Rank;
 use crate::GameState;
 use crate::GameTurn;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Board {
-    data: [[PieceColor; 8]; 8],
+    data: [PieceColor; 64],
 }
 
 impl Board {
-    pub fn get_piece_at(&self, pos: &(File, Rank)) -> PieceColor {
-        let (f, r) = pos;
-        self.data[usize::from(f)][usize::from(r)]
+    pub fn new(fen: Option<String>) -> Self {
+        if let Some(_fen) = fen {
+            todo!();
+        } else {
+            Self {
+                data: [PieceColor::Empty; 64],
+            }
+        }
     }
 
-    pub fn set_piece_at(&mut self, pos: &(File, Rank), piece_color: PieceColor) {
-        let (f, r) = pos;
-        self.data[usize::from(f)][usize::from(r)] = piece_color;
+    pub(crate) fn get_piece_at(&self, pos: &(u8, u8)) -> PieceColor {
+        let (x, y) = pos;
+        self.data[*y as usize * 8 + *x as usize]
     }
 
-    pub fn check_promotion(&self, pos: &(File, Rank), turn: &GameTurn) -> GameState {
+    pub(crate) fn set_piece_at(&mut self, pos: &(u8, u8), piece_color: PieceColor) {
+        let (x, y) = pos;
+        self.data[*y as usize * 8 + *x as usize] = piece_color;
+    }
+
+    pub(crate) fn check_promotion(&self, pos: &(u8, u8), turn: &GameTurn) -> Option<GameState> {
         match turn {
             GameTurn::White => {
-                if pos.0 == File::Eight {
-                    return GameState::Promotion(*pos);
+                if pos.1 == 0 {
+                    return Some(GameState::Promotion((
+                        Rank::try_from(pos.0).ok()?,
+                        File::try_from(pos.1).ok()?,
+                    )))
                 }
             }
             GameTurn::Black => {
-                if pos.0 == File::One {
-                    return GameState::Promotion(*pos);
+                if pos.1 == 7 {
+                    return Some(GameState::Promotion((
+                        Rank::try_from(pos.0).ok()?,
+                        File::try_from(pos.1).ok()?,
+                    )))
                 }
             }
-        }
-        GameState::InProgress
+            }
+        Some(GameState::InProgress)
     }
 }
 
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = String::new();
-        for file in self.data {
-            for rank in file {
-                res.push_str(format!("{} ", rank).as_str());
+        for (i, p) in self.data.iter().enumerate() {
+            if i % 8 == 0 {
+                res.push('\n');
+            } else {
+                res.push_str(format!("{}", p).as_str());
             }
-            res.push('\n');
         }
         write!(f, "{}", res)
     }
@@ -55,35 +72,36 @@ impl Display for Board {
 
 impl Default for Board {
     fn default() -> Self {
-        let mut data: [[PieceColor; 8]; 8] = [[PieceColor::Empty; 8]; 8];
-        data[0] = (
-            PieceColor::Black(Rook),
-            PieceColor::Black(Knight),
-            PieceColor::Black(Bishop),
-            PieceColor::Black(Queen),
-            PieceColor::Black(King),
-            PieceColor::Black(Bishop),
-            PieceColor::Black(Knight),
-            PieceColor::Black(Rook),
-        )
-            .into();
-        data[1] = [PieceColor::Black(Pawn(true)); 8];
-        data[2] = [PieceColor::Empty; 8];
-        data[3] = [PieceColor::Empty; 8];
-        data[4] = [PieceColor::Empty; 8];
-        data[5] = [PieceColor::Empty; 8];
-        data[6] = [PieceColor::White(Pawn(true)); 8];
-        data[7] = (
-            PieceColor::White(Rook),
-            PieceColor::White(Knight),
-            PieceColor::White(Bishop),
-            PieceColor::White(Queen),
-            PieceColor::White(King),
-            PieceColor::White(Bishop),
-            PieceColor::White(Knight),
-            PieceColor::White(Rook),
-        )
-            .into();
-        Board { data }
+        let mut board = Board {
+            data: [PieceColor::Empty; 64],
+        };
+
+        board.set_piece_at(&(0, 0), PieceColor::Black(Piece::Rook));
+        board.set_piece_at(&(1, 0), PieceColor::Black(Piece::Knight));
+        board.set_piece_at(&(2, 0), PieceColor::Black(Piece::Bishop));
+        board.set_piece_at(&(3, 0), PieceColor::Black(Piece::Queen));
+        board.set_piece_at(&(4, 0), PieceColor::Black(Piece::King));
+        board.set_piece_at(&(5, 0), PieceColor::Black(Piece::Bishop));
+        board.set_piece_at(&(6, 0), PieceColor::Black(Piece::Knight));
+        board.set_piece_at(&(7, 0), PieceColor::Black(Piece::Rook));
+
+        for i in 0..8 {
+            board.set_piece_at(&(i, 1), PieceColor::Black(Piece::Pawn(true)));
+        }
+
+        board.set_piece_at(&(0, 7), PieceColor::White(Piece::Rook));
+        board.set_piece_at(&(1, 7), PieceColor::White(Piece::Knight));
+        board.set_piece_at(&(2, 7), PieceColor::White(Piece::Bishop));
+        board.set_piece_at(&(3, 7), PieceColor::White(Piece::Queen));
+        board.set_piece_at(&(4, 7), PieceColor::White(Piece::King));
+        board.set_piece_at(&(5, 7), PieceColor::White(Piece::Bishop));
+        board.set_piece_at(&(6, 7), PieceColor::White(Piece::Knight));
+        board.set_piece_at(&(7, 7), PieceColor::White(Piece::Rook));
+
+        for i in 0..8 {
+            board.set_piece_at(&(i, 6), PieceColor::White(Piece::Pawn(true)));
+        }
+
+        board
     }
 }
