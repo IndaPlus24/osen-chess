@@ -376,7 +376,7 @@ pub(crate) fn check_pawn_cap_move(
     board: &Board,
     turn: &GameTurn,
 ) -> Option<(u8, u8)> {
-    let dir = add_along_dir(&dir, pos, len);
+    let dir = add_along_dir(dir, pos, len);
     let cap_pos = dir.first()?;
     let board_pos = board.get_piece_at(cap_pos);
     match board_pos {

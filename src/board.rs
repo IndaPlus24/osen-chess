@@ -40,7 +40,7 @@ impl Board {
                     return Some(GameState::Promotion((
                         Rank::try_from(pos.0).ok()?,
                         File::try_from(pos.1).ok()?,
-                    )))
+                    )));
                 }
             }
             GameTurn::Black => {
@@ -48,10 +48,10 @@ impl Board {
                     return Some(GameState::Promotion((
                         Rank::try_from(pos.0).ok()?,
                         File::try_from(pos.1).ok()?,
-                    )))
+                    )));
                 }
             }
-            }
+        }
         Some(GameState::InProgress)
     }
 }
@@ -60,10 +60,9 @@ impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = String::new();
         for (i, p) in self.data.iter().enumerate() {
-            if i % 8 == 0 {
+            res.push_str(format!("{}", p).as_str());
+            if (i + 1) % 8 == 0 {
                 res.push('\n');
-            } else {
-                res.push_str(format!("{}", p).as_str());
             }
         }
         write!(f, "{}", res)

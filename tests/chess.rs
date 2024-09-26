@@ -8,8 +8,7 @@ use osen_chess::GameState;
 fn pawn_make_move() {
     let mut game = Game::default();
 
-    let game_state = game.make_move((Rank::A, File::Two), (Rank::A, File::Four));
-    println!("{}", game.get_board());
-    println!("{game_state:?}");
-    assert!(matches!(game_state, Ok(GameState::InProgress)))
+    let _ = game.make_move((Rank::A, File::Two), (Rank::A, File::Four));
+    println!("{}", game);
+    assert!(matches!(game.get_state(), GameState::InProgress))
 }
