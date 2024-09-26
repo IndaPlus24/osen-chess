@@ -14,7 +14,7 @@ impl PieceColor {
         match self {
             PieceColor::White(p) => *p = piece,
             PieceColor::Black(p) => *p = piece,
-            PieceColor::Empty => return Err(ChessError::DeSyncedTurnColor),
+            PieceColor::Empty => return Err(ChessError::MismatchedColor),
         };
         Ok(())
     }
@@ -256,11 +256,20 @@ impl Display for Piece {
 }
 
 impl Piece {
-    fn get_move_set(self) -> Vec<(i8, i8)> {
+    fn get_move_set(&self, turn: &GameTurn) -> Vec<(i8, i8)> {
+        let flip_y = match turn {
+            GameTurn::White => 1,
+            GameTurn::Black => -1,
+        };
         match self {
             Piece::Pawn(first_move) => match first_move {
-                true => vec![(-1, -1), (1, -1), (0, -1), (0, -2)],
-                false => vec![(-1, -1), (1, -1), (0, -1)],
+                true => vec![
+                    (-1, -1 * flip_y),
+                    (1, -1 * flip_y),
+                    (0, -1 * flip_y),
+                    (0, -2 * flip_y),
+                ],
+                false => vec![(-1, -1 * flip_y), (1, -1 * flip_y), (0, -1 * flip_y)],
             },
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
             Piece::Knight => vec![
@@ -300,7 +309,7 @@ impl Piece {
             Piece::King => PieceLen::One,
         };
 
-        let move_dirs = self.get_move_set();
+        let move_dirs = self.get_move_set(turn);
 
         if let Piece::Pawn(_) = self {
             let mut moves = vec![];
@@ -315,7 +324,9 @@ impl Piece {
                 moves.push(p);
             }
 
-            return self.collect_along_dirs(board, turn, move_dirs, pos, &len);
+            moves.append(&mut self.collect_along_dirs(board, turn, move_dirs, pos, &len));
+
+            return moves;
         }
 
         self.collect_along_dirs(board, turn, move_dirs.into_iter(), pos, &len)
@@ -490,7 +501,7 @@ mod piece_test {
             let moves = piece.collect_along_dirs(
                 &game.board,
                 &GameTurn::White,
-                piece.get_move_set().into_iter(),
+                piece.get_move_set(&game.get_turn()).into_iter(),
                 &pos,
                 &PieceLen::One,
             );
@@ -509,7 +520,7 @@ mod piece_test {
             let moves = piece.collect_along_dirs(
                 &game.board,
                 &GameTurn::White,
-                piece.get_move_set().into_iter(),
+                piece.get_move_set(&game.get_turn()).into_iter(),
                 &pos,
                 &PieceLen::One,
             );
@@ -531,7 +542,7 @@ mod piece_test {
             let moves = piece.collect_along_dirs(
                 &game.board,
                 &GameTurn::White,
-                piece.get_move_set().into_iter(),
+                piece.get_move_set(&game.get_turn()).into_iter(),
                 &pos,
                 &PieceLen::One,
             );

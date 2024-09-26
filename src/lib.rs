@@ -60,8 +60,8 @@ impl Not for GameTurn {
 pub enum ChessError {
     /// Moved to a unreachable position
     InvalidMove,
-    /// Turn desynced from Game struct
-    DeSyncedTurnColor,
+    /// PieceColor mismatch from turn color for Game struct
+    MismatchedColor,
     /// Position out of bounds on board
     OutOfBounds,
     /// Selecting a empty space
@@ -110,11 +110,7 @@ impl Game {
 
     /// If the current game state is InProgress and the move is legal,
     /// move a piece and return the resulting state of the game.
-    pub fn make_move(
-        &mut self,
-        from: (Rank, File),
-        to: (Rank, File),
-    ) -> Result<(), ChessError> {
+    pub fn make_move(&mut self, from: (Rank, File), to: (Rank, File)) -> Result<(), ChessError> {
         // convert to u8
         let from: (u8, u8) = (from.0.into(), from.1.into());
         let to: (u8, u8) = (to.0.into(), to.1.into());
@@ -123,12 +119,12 @@ impl Game {
         let piece = match self.turn {
             GameTurn::White => match piece_color {
                 PieceColor::White(p) => p,
-                PieceColor::Black(_) => return Err(ChessError::DeSyncedTurnColor),
+                PieceColor::Black(_) => return Err(ChessError::MismatchedColor),
                 PieceColor::Empty => return Err(ChessError::EmptySpace),
             },
             GameTurn::Black => match piece_color {
                 PieceColor::Black(p) => p,
-                PieceColor::White(_) => return Err(ChessError::DeSyncedTurnColor),
+                PieceColor::White(_) => return Err(ChessError::MismatchedColor),
                 PieceColor::Empty => return Err(ChessError::EmptySpace),
             },
         };
@@ -136,35 +132,10 @@ impl Game {
         let moves = piece.get_possible_moves(&self.board, &self.turn, &from);
         println!("{moves:?}");
 
-        // if trying to move to impossible space
+        // if trying to move to non-possible space
         if !moves.contains(&to) {
             return Err(ChessError::InvalidMove);
         }
-
-        // Test move piece
-        let mut test_board = self.board.clone();
-        test_board.set_piece_at(&to, piece_color);
-        test_board.set_piece_at(&from, PieceColor::Empty);
-
-        let mut king_pos = self.king_pos;
-
-        // if king moves update king pos
-        if piece == Piece::King {
-            match self.turn {
-                GameTurn::White => king_pos.white = to,
-                GameTurn::Black => king_pos.black = to,
-            }
-        }
-
-        let king_pos = match self.turn {
-            GameTurn::White => king_pos.white,
-            GameTurn::Black => king_pos.black,
-        };
-
-        // Test for check
-        // if self.is_check(&test_board, &self.turn, &king_pos) {
-        //     return Err(ChessError::CheckPos);
-        // }
 
         // Move piece
         self.board.set_piece_at(&to, piece_color);
@@ -183,10 +154,6 @@ impl Game {
             GameTurn::White => self.king_pos.black,
             GameTurn::Black => self.king_pos.white,
         };
-        // if self.is_check(&self.board, &!self.turn, &king_pos) {
-        //     self.next_turn();
-        //     return Ok(GameState::Check);
-        // }
 
         // Switch turn
         self.next_turn();
@@ -249,7 +216,7 @@ impl Game {
 
     /// If a piece is standing on the given tile, return all possible
     /// new positions of that piece. Or None if empty space
-    pub fn get_possible_moves(&self, position: (File, Rank)) -> Option<Vec<(Rank, File)>> {
+    pub fn get_possible_moves(&self, position: (Rank, File)) -> Option<Vec<(Rank, File)>> {
         let position = (position.0.into(), position.1.into());
         match self.board.get_piece_at(&position) {
             PieceColor::White(piece) | PieceColor::Black(piece) => {
@@ -303,7 +270,10 @@ mod lib_test {
 
         println!("{}", game.board);
 
-        assert_eq!(GameState::Promotion((Rank::A, File::Eight)), game.get_state());
+        assert_eq!(
+            GameState::Promotion((Rank::A, File::Eight)),
+            game.get_state()
+        );
 
         if let GameState::Promotion(_) = game.get_state() {
             let _ = game.set_promotion(Piece::Queen);
