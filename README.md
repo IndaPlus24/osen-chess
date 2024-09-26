@@ -9,15 +9,16 @@ A chess engine
 
 # Docs
 
-´´´bash
-# Create docs and open browser
+Create docs and open in browser
+
+```rust
 cargo doc --open
-´´´
+```
 
 
 ## Example
 
-´´´rust
+```rust
 fn main() {
     let mut game = Game::default();
 
@@ -27,4 +28,4 @@ fn main() {
         Err(e) => {eprintln!("{e:?}")},
     }
 }
-´´´
+```
