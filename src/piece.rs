@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::{board::Board, ChessError, GameTurn};
 
+/// A piece color on the board, holing the piece type
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PieceColor {
     White(Piece),
@@ -10,7 +11,7 @@ pub enum PieceColor {
 }
 
 impl PieceColor {
-    pub fn set_piece(&mut self, piece: Piece) -> Result<(), ChessError> {
+    pub(crate) fn set_piece(&mut self, piece: Piece) -> Result<(), ChessError> {
         match self {
             PieceColor::White(p) => *p = piece,
             PieceColor::Black(p) => *p = piece,
@@ -40,6 +41,7 @@ impl From<PieceColor> for GameTurn {
     }
 }
 
+/// The y position on the board
 #[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum File {
     One,
@@ -103,6 +105,7 @@ impl From<File> for u8 {
     }
 }
 
+/// The x position of the board
 #[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum Rank {
     A,
@@ -147,36 +150,6 @@ impl TryFrom<u8> for Rank {
             6 => Ok(Rank::G),
             7 => Ok(Rank::H),
             _ => Err(ChessError::OutOfBounds),
-        }
-    }
-}
-
-impl From<Rank> for usize {
-    fn from(val: Rank) -> Self {
-        match val {
-            Rank::A => 0,
-            Rank::B => 1,
-            Rank::C => 2,
-            Rank::D => 3,
-            Rank::E => 4,
-            Rank::F => 5,
-            Rank::G => 6,
-            Rank::H => 7,
-        }
-    }
-}
-
-impl From<&Rank> for usize {
-    fn from(val: &Rank) -> Self {
-        match val {
-            Rank::A => 0,
-            Rank::B => 1,
-            Rank::C => 2,
-            Rank::D => 3,
-            Rank::E => 4,
-            Rank::F => 5,
-            Rank::G => 6,
-            Rank::H => 7,
         }
     }
 }
@@ -226,9 +199,10 @@ impl From<&Rank> for i8 {
     }
 }
 
-/// To indicate if move is its first
+/// To indicate if a move is a pawn's first
 pub type IsFirstMove = bool;
 
+/// Piece type
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Piece {
     Pawn(IsFirstMove),
@@ -263,13 +237,8 @@ impl Piece {
         };
         match self {
             Piece::Pawn(first_move) => match first_move {
-                true => vec![
-                    (-1, -1 * flip_y),
-                    (1, -1 * flip_y),
-                    (0, -1 * flip_y),
-                    (0, -2 * flip_y),
-                ],
-                false => vec![(-1, -1 * flip_y), (1, -1 * flip_y), (0, -1 * flip_y)],
+                true => vec![(-1, -flip_y), (1, -flip_y), (0, -flip_y), (0, -2 * flip_y)],
+                false => vec![(-1, -flip_y), (1, -flip_y), (0, -flip_y)],
             },
             Piece::Rook => vec![(0, 1), (1, 0), (0, -1), (-1, 0)],
             Piece::Knight => vec![
@@ -296,7 +265,7 @@ impl Piece {
         }
     }
 
-    pub fn get_possible_moves(
+    pub(crate) fn get_possible_moves(
         self,
         board: &Board,
         turn: &GameTurn,

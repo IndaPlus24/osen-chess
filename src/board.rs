@@ -13,7 +13,7 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(fen: Option<String>) -> Self {
+    pub(crate) fn new(fen: Option<String>) -> Self {
         if let Some(_fen) = fen {
             todo!();
         } else {

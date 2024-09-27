@@ -72,6 +72,7 @@ pub enum ChessError {
     CheckPos,
 }
 
+/// Game
 pub struct Game {
     state: GameState,
     turn: GameTurn,
@@ -109,8 +110,13 @@ impl Game {
     }
 
     /// If the current game state is InProgress and the move is legal,
-    /// move a piece and return the resulting state of the game.
+    /// move a piece and return the sets state of the game. Or returns the move error
     pub fn make_move(&mut self, from: (Rank, File), to: (Rank, File)) -> Result<(), ChessError> {
+        match self.state {
+            GameState::InProgress => (),
+            _ => return Err(ChessError::InvalidGameState),
+        }
+
         // convert to u8
         let from: (u8, u8) = (from.0.into(), from.1.into());
         let to: (u8, u8) = (to.0.into(), to.1.into());
