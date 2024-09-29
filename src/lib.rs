@@ -56,6 +56,16 @@ impl Not for GameTurn {
     }
 }
 
+impl Not for &GameTurn {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            GameTurn::White => &GameTurn::Black,
+            GameTurn::Black => &GameTurn::White,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChessError {
     /// Moved to a unreachable position
@@ -68,8 +78,8 @@ pub enum ChessError {
     EmptySpace,
     /// Funktion called in wrong game state
     InvalidGameState,
-    /// Set yourself in check
-    CheckPos,
+    /// Board in check, need to move king
+    InCheck,
 }
 
 /// Game
@@ -110,16 +120,21 @@ impl Game {
     }
 
     /// If the current game state is InProgress and the move is legal,
-    /// move a piece and return the sets state of the game. Or returns the move error
+    /// move a piece and sets the state of the game. Or returns the move error
     pub fn make_move(&mut self, from: (Rank, File), to: (Rank, File)) -> Result<(), ChessError> {
-        match self.state {
-            GameState::InProgress => (),
-            _ => return Err(ChessError::InvalidGameState),
-        }
-
         // convert to u8
         let from: (u8, u8) = (from.0.into(), from.1.into());
         let to: (u8, u8) = (to.0.into(), to.1.into());
+
+        match self.state {
+            GameState::InProgress => (),
+            GameState::Check => {
+                if self.board.get_piece_at(&from) != self.king_piece() {
+                    return Err(ChessError::InCheck);
+                }
+            }
+            _ => return Err(ChessError::InvalidGameState),
+        }
 
         let piece_color = self.board.get_piece_at(&from);
         let piece = match self.turn {
@@ -160,31 +175,16 @@ impl Game {
             GameTurn::White => self.king_pos.black,
             GameTurn::Black => self.king_pos.white,
         };
+        if self.board.is_check(&self.turn, &king_pos) {
+            self.next_turn();
+            self.state = GameState::Check;
+            return Ok(());
+        }
 
         // Switch turn
         self.next_turn();
         self.state = GameState::InProgress;
         Ok(())
-    }
-
-    fn is_check(&self, board: &Board, turn: &GameTurn, king_pos: &(u8, u8)) -> bool {
-        Piece::Queen
-            .get_possible_moves(&self.board, turn, king_pos)
-            .into_iter()
-            .map(|pos| (board.get_piece_at(&pos), pos))
-            .filter_map(|(p, pos)| match p {
-                PieceColor::White(piece) => match turn {
-                    GameTurn::White => None,
-                    GameTurn::Black => Some((piece, pos)),
-                },
-                PieceColor::Black(piece) => match turn {
-                    GameTurn::White => Some((piece, pos)),
-                    GameTurn::Black => None,
-                },
-                PieceColor::Empty => None,
-            })
-            .map(|(p, pos)| p.get_possible_moves(&self.board, turn, &pos))
-            .any(|m| m.contains(king_pos))
     }
 
     fn next_turn(&mut self) {
@@ -197,6 +197,25 @@ impl Game {
 
     pub fn get_state(&self) -> GameState {
         self.state
+    }
+
+    /// Get a refrence to the board, useful to be able to iterator over.
+    pub fn get_board(&self) -> &Board {
+        &self.board
+    }
+
+    fn king_piece(&self) -> PieceColor {
+        match self.turn {
+            GameTurn::White => self.board.get_piece_at(&self.king_pos.white),
+            GameTurn::Black => self.board.get_piece_at(&self.king_pos.black),
+        }
+    }
+
+    fn king_pos(&self) -> (u8, u8) {
+        match self.turn {
+            GameTurn::White => self.king_pos.white,
+            GameTurn::Black => self.king_pos.black,
+        }
     }
 
     /// Set the piece type that a pawn becomes following a promotion.
@@ -310,5 +329,43 @@ mod lib_test {
                 (Rank::G, File::Seven),
             ])
         )
+    }
+
+    #[test]
+    fn check_test() {
+        let mut board = Board::new(None);
+        board.set_piece_at(&(0, 4), PieceColor::White(Piece::King));
+        board.set_piece_at(&(4, 5), PieceColor::Black(Piece::Queen));
+        let king_pos = crate::KingPos {
+            black: (4, 0),
+            white: (0, 4),
+        };
+        let mut game = Game::new(GameTurn::Black, board, king_pos);
+        println!("{}", game);
+
+        let _ = game.make_move((Rank::E, File::Three), (Rank::E, File::Four));
+
+        println!("{}", game);
+
+        assert_eq!(game.state, GameState::Check)
+    }
+
+    #[test]
+    fn check_knight_test() {
+        let mut board = Board::new(None);
+        board.set_piece_at(&(0, 4), PieceColor::Black(Piece::King));
+        board.set_piece_at(&(3, 3), PieceColor::White(Piece::Knight));
+        let king_pos = crate::KingPos {
+            white: (4, 0),
+            black: (0, 4),
+        };
+        let mut game = Game::new(GameTurn::White, board, king_pos);
+        println!("{}", game);
+
+        let _ = game.make_move((Rank::D, File::Five), (Rank::C, File::Three));
+
+        println!("{}", game);
+
+        assert_eq!(game.state, GameState::Check)
     }
 }

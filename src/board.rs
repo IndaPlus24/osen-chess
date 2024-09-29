@@ -23,6 +23,41 @@ impl Board {
         }
     }
 
+    pub(crate) fn is_check(&self, turn: &GameTurn, king_pos: &(u8, u8)) -> bool {
+        println!("Checking... {:?} for {:?}", king_pos, turn);
+        let q = Piece::Queen
+            .get_possible_moves(self, !turn, king_pos)
+            .into_iter()
+            .map(|pos| (self.get_piece_at(&pos), pos))
+            .filter_map(|(p, pos)| match p {
+                PieceColor::White(piece) | PieceColor::Black(piece) => Some((piece, pos)),
+                PieceColor::Empty => None,
+            })
+            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+            .any(|m| {
+                println!("{m:?}, king pos: {king_pos:?}");
+                view_pos(&m);
+                m.contains(king_pos)
+            });
+        if q {
+            return q;
+        }
+        Piece::Knight
+            .get_possible_moves(self, !turn, king_pos)
+            .into_iter()
+            .map(|pos| (self.get_piece_at(&pos), pos))
+            .filter_map(|(p, pos)| match p {
+                PieceColor::White(piece) | PieceColor::Black(piece) => Some((piece, pos)),
+                PieceColor::Empty => None,
+            })
+            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+            .any(|m| {
+                println!("{m:?}, king pos: {king_pos:?}");
+                view_pos(&m);
+                m.contains(king_pos)
+            })
+    }
+
     pub(crate) fn get_piece_at(&self, pos: &(u8, u8)) -> PieceColor {
         let (x, y) = pos;
         self.data[*y as usize * 8 + *x as usize]
@@ -103,4 +138,12 @@ impl Default for Board {
 
         board
     }
+}
+
+pub(crate) fn view_pos(positions: &[(u8, u8)]) {
+    let mut board = Board::new(None);
+    for pos in positions {
+        board.set_piece_at(pos, PieceColor::White(Piece::Queen));
+    }
+    println!("{}", board);
 }

@@ -5,7 +5,7 @@ A chess engine
 
 - [x] Basic moves
 - [x] Promotion
-- [ ] Check
+- [x] Check
 
 # Docs
 
