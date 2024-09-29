@@ -248,6 +248,7 @@ mod lib_test {
     use crate::Game;
     use crate::GameState;
     use crate::GameTurn;
+    use crate::KingPos;
 
     // check that game state is in progress after initialisation
     #[test]
@@ -285,5 +286,29 @@ mod lib_test {
             let _ = game.set_promotion(Piece::Queen);
             assert_eq!(GameState::InProgress, game.get_state())
         }
+    }
+
+    #[test]
+    fn rook_move_test() {
+        let mut board = Board::default();
+        board.set_piece_at(&(7, 1), PieceColor::White(Piece::Rook));
+
+        let king_pos = KingPos::default();
+        let game = Game::new(GameTurn::White, board, king_pos);
+        let moves = game.get_possible_moves((Rank::H, File::Seven));
+        println!("{game}");
+        println!("{moves:?}");
+
+        assert_eq!(
+            moves,
+            Some(vec![
+                (Rank::H, File::Six),
+                (Rank::H, File::Five),
+                (Rank::H, File::Four),
+                (Rank::H, File::Three),
+                (Rank::H, File::Eight),
+                (Rank::G, File::Seven),
+            ])
+        )
     }
 }

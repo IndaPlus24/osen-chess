@@ -314,12 +314,17 @@ impl Piece {
 
         moves
             .map(|list| {
+                let mut stop = false;
                 let res = list
                     .into_iter()
                     .map_while(|dir_pos| {
                         let moves = self.match_along_dir(board, turn, dir_pos);
-                        println!("{moves:?}");
-                        moves
+                        println!("{:?}", moves);
+                        if stop {
+                            return None;
+                        }
+                        stop = moves.1;
+                        moves.0
                     })
                     .collect::<Vec<(u8, u8)>>();
                 println!("{res:?}");
@@ -334,17 +339,17 @@ impl Piece {
         board: &Board,
         turn: &GameTurn,
         dir_pos: (u8, u8),
-    ) -> Option<(u8, u8)> {
+    ) -> (Option<(u8, u8)>, bool) {
         match board.get_piece_at(&dir_pos) {
             PieceColor::White(_) => match turn {
-                GameTurn::White => None,
-                GameTurn::Black => Some(dir_pos),
+                GameTurn::White => (None, true),
+                GameTurn::Black => (Some(dir_pos), true),
             },
             PieceColor::Black(_) => match turn {
-                GameTurn::White => Some(dir_pos),
-                GameTurn::Black => None,
+                GameTurn::White => (Some(dir_pos), true),
+                GameTurn::Black => (None, true),
             },
-            PieceColor::Empty => Some(dir_pos),
+            PieceColor::Empty => (Some(dir_pos), false),
         }
     }
 }
@@ -456,7 +461,7 @@ mod piece_test {
         if let PieceColor::White(p) = piece {
             let res = p.match_along_dir(&board, &GameTurn::White, dir_pos);
             println!("{res:?}");
-            assert_eq!(res, Some(dir_pos))
+            assert_eq!(res, (Some(dir_pos), true))
         };
     }
 
