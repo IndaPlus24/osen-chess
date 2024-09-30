@@ -119,6 +119,11 @@ impl Game {
         }
     }
 
+    /// Returns a piece on the board
+    pub fn get_piece_at(&self, pos: &(Rank, File)) -> PieceColor {
+        self.board.get_piece_at(&(pos.0.into(), pos.1.into()))
+    }
+
     /// If the current game state is InProgress and the move is legal,
     /// move a piece and sets the state of the game. Or returns the move error
     pub fn make_move(&mut self, from: (Rank, File), to: (Rank, File)) -> Result<(), ChessError> {
