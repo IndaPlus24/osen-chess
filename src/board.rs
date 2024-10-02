@@ -7,7 +7,7 @@ use crate::piece::Rank;
 use crate::GameState;
 use crate::GameTurn;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Board {
     data: [PieceColor; 64],
 }

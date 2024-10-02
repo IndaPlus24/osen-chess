@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::{board::Board, ChessError, GameTurn};
 
 /// A piece color on the board, holing the piece type
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PieceColor {
     White(Piece),
     Black(Piece),
@@ -42,7 +42,7 @@ impl From<PieceColor> for GameTurn {
 }
 
 /// The y position on the board
-#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord, Hash)]
 pub enum File {
     One,
     Two,
@@ -88,7 +88,7 @@ impl From<File> for u8 {
 }
 
 /// The x position of the board
-#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord, Hash)]
 pub enum Rank {
     A,
     B,
@@ -137,7 +137,7 @@ impl From<Rank> for u8 {
 pub type IsFirstMove = bool;
 
 /// Piece type
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Piece {
     Pawn(IsFirstMove),
     Rook,

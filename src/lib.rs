@@ -10,7 +10,7 @@ use crate::{
     piece::{File, Rank},
 };
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GameState {
     /// Game in progress
     InProgress,
@@ -39,7 +39,7 @@ impl Default for KingPos {
 }
 
 /// Game turn
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum GameTurn {
     White,
     Black,
@@ -66,7 +66,7 @@ impl Not for &GameTurn {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ChessError {
     /// Moved to a unreachable position
     InvalidMove,
@@ -83,6 +83,7 @@ pub enum ChessError {
 }
 
 /// Game
+#[derive(Debug, Clone)]
 pub struct Game {
     state: GameState,
     turn: GameTurn,
@@ -216,13 +217,6 @@ impl Game {
         }
     }
 
-    fn king_pos(&self) -> (u8, u8) {
-        match self.turn {
-            GameTurn::White => self.king_pos.white,
-            GameTurn::Black => self.king_pos.black,
-        }
-    }
-
     /// Set the piece type that a pawn becomes following a promotion.
     pub fn set_promotion(&mut self, piece: Piece) -> Result<(), ChessError> {
         println!("{:?}", self.state);
@@ -269,6 +263,7 @@ mod lib_test {
     use crate::piece::PieceColor;
     use crate::piece::Rank;
     use crate::Board;
+    use crate::ChessError;
     use crate::Game;
     use crate::GameState;
     use crate::GameTurn;
