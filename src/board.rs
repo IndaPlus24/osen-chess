@@ -9,7 +9,7 @@ use crate::GameTurn;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Board {
-    data: [PieceColor; 64],
+    pub(crate) data: [PieceColor; 64],
 }
 
 impl Board {

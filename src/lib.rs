@@ -205,9 +205,9 @@ impl Game {
         self.state
     }
 
-    /// Get a refrence to the board, useful to be able to iterator over.
-    pub fn get_board(&self) -> &Board {
-        &self.board
+    /// Get a slice of the board
+    pub fn get_board(&self) -> &[PieceColor] {
+        &self.board.data
     }
 
     fn king_piece(&self) -> PieceColor {
@@ -279,6 +279,16 @@ mod lib_test {
         assert_eq!(game.state, GameState::InProgress);
         assert_eq!(game.turn, GameTurn::White);
         assert_eq!(game.board, Board::default());
+    }
+
+    #[test]
+    fn pawn_make_move() {
+        let mut game = Game::default();
+
+        let m = game.make_move((Rank::A, File::Two), (Rank::A, File::Four)); 
+
+        assert_eq!(m, Ok(()));
+        assert_eq!(game.state, GameState::InProgress);
     }
 
     #[test]
