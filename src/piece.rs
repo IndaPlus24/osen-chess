@@ -54,24 +54,6 @@ pub enum File {
     Eight,
 }
 
-impl TryFrom<i8> for File {
-    type Error = ChessError;
-
-    fn try_from(value: i8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(File::One),
-            1 => Ok(File::Two),
-            2 => Ok(File::Three),
-            3 => Ok(File::Four),
-            4 => Ok(File::Five),
-            5 => Ok(File::Six),
-            6 => Ok(File::Seven),
-            7 => Ok(File::Eight),
-            _ => Err(ChessError::OutOfBounds),
-        }
-    }
-}
-
 impl TryFrom<u8> for File {
     type Error = ChessError;
 
@@ -118,24 +100,6 @@ pub enum Rank {
     H,
 }
 
-impl TryFrom<i8> for Rank {
-    type Error = ChessError;
-
-    fn try_from(value: i8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Rank::A),
-            1 => Ok(Rank::B),
-            2 => Ok(Rank::C),
-            3 => Ok(Rank::D),
-            4 => Ok(Rank::E),
-            5 => Ok(Rank::F),
-            6 => Ok(Rank::G),
-            7 => Ok(Rank::H),
-            _ => Err(ChessError::OutOfBounds),
-        }
-    }
-}
-
 impl TryFrom<u8> for Rank {
     type Error = ChessError;
 
@@ -156,36 +120,6 @@ impl TryFrom<u8> for Rank {
 
 impl From<Rank> for u8 {
     fn from(val: Rank) -> Self {
-        match val {
-            Rank::A => 0,
-            Rank::B => 1,
-            Rank::C => 2,
-            Rank::D => 3,
-            Rank::E => 4,
-            Rank::F => 5,
-            Rank::G => 6,
-            Rank::H => 7,
-        }
-    }
-}
-
-impl From<Rank> for i8 {
-    fn from(val: Rank) -> Self {
-        match val {
-            Rank::A => 0,
-            Rank::B => 1,
-            Rank::C => 2,
-            Rank::D => 3,
-            Rank::E => 4,
-            Rank::F => 5,
-            Rank::G => 6,
-            Rank::H => 7,
-        }
-    }
-}
-
-impl From<&Rank> for i8 {
-    fn from(val: &Rank) -> Self {
         match val {
             Rank::A => 0,
             Rank::B => 1,
