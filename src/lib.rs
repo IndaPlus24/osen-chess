@@ -32,8 +32,8 @@ pub(crate) struct KingPos {
 impl Default for KingPos {
     fn default() -> Self {
         Self {
-            black: (0, 4),
-            white: (7, 4),
+            black: (4, 7),
+            white: (4, 0),
         }
     }
 }
@@ -133,12 +133,7 @@ impl Game {
         let to: (u8, u8) = (to.0.into(), to.1.into());
 
         match self.state {
-            GameState::InProgress => (),
-            GameState::Check => {
-                if self.board.get_piece_at(&from) != self.king_piece() {
-                    return Err(ChessError::InCheck);
-                }
-            }
+            GameState::InProgress  | GameState::Check => (),
             _ => return Err(ChessError::InvalidGameState),
         }
 
@@ -283,10 +278,14 @@ mod lib_test {
 
     #[test]
     fn pawn_make_move() {
-        let mut game = Game::default();
+        let mut board = Board::default();
+        board.set_piece_at(&(6, 2), PieceColor::White(Piece::Pawn(false)));
 
-        let m = game.make_move((Rank::A, File::Two), (Rank::A, File::Four)); 
+        let king_pos = KingPos::default();
+        let mut game = Game::new(GameTurn::White, board, king_pos);
+        let m = game.make_move((Rank::G, File::Six), (Rank::H, File::Seven));
 
+        println!("{game}");
         assert_eq!(m, Ok(()));
         assert_eq!(game.state, GameState::InProgress);
     }
