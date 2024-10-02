@@ -3,6 +3,7 @@ pub mod piece;
 
 use std::{fmt::Display, ops::Not};
 
+use board::view_pos;
 use piece::{Piece, PieceColor};
 
 use crate::{
@@ -133,7 +134,7 @@ impl Game {
         let to: (u8, u8) = (to.0.into(), to.1.into());
 
         match self.state {
-            GameState::InProgress  | GameState::Check => (),
+            GameState::InProgress | GameState::Check => (),
             _ => return Err(ChessError::InvalidGameState),
         }
 
@@ -152,7 +153,16 @@ impl Game {
         };
 
         let moves = piece.get_possible_moves(&self.board, &self.turn, &from);
-        println!("{moves:?}");
+        println!("Piece moves; {moves:?}");
+        // view_pos(&moves);
+
+        // Remove check making moves
+        let moves: Vec<(u8, u8)> = moves
+            .into_iter()
+            .filter(|p| !self.board.is_pos_check(&self.turn, &self.get_king_pos(&self.turn), p))
+            .collect();
+        println!("Piece moves filtered; {moves:?}");
+        view_pos(&moves);
 
         // if trying to move to non-possible space
         if !moves.contains(&to) {
@@ -172,11 +182,12 @@ impl Game {
         }
 
         // Check if in check
-        let king_pos = match self.turn {
-            GameTurn::White => self.king_pos.black,
-            GameTurn::Black => self.king_pos.white,
-        };
-        if self.board.is_check(&self.turn, &king_pos) {
+        if self.board.is_check(&self.turn, &self.get_king_pos(&self.turn)) {
+            self.next_turn();
+            self.state = GameState::Check;
+            return Ok(());
+        }
+        if self.board.is_check(&self.turn, &self.get_king_pos(&!self.turn)) {
             self.next_turn();
             self.state = GameState::Check;
             return Ok(());
@@ -205,10 +216,10 @@ impl Game {
         &self.board.data
     }
 
-    fn king_piece(&self) -> PieceColor {
-        match self.turn {
-            GameTurn::White => self.board.get_piece_at(&self.king_pos.white),
-            GameTurn::Black => self.board.get_piece_at(&self.king_pos.black),
+    fn get_king_pos(&self, turn: &GameTurn) -> (u8, u8) {
+        match turn {
+            GameTurn::White => self.king_pos.white,
+            GameTurn::Black => self.king_pos.black,
         }
     }
 
@@ -227,6 +238,15 @@ impl Game {
         self.board.set_piece_at(&pos, piece_color);
 
         // Check for check here
+        let king_pos = match self.turn {
+            GameTurn::White => self.king_pos.black,
+            GameTurn::Black => self.king_pos.white,
+        };
+        if self.board.is_check(&self.turn, &king_pos) {
+            self.next_turn();
+            self.state = GameState::Check;
+            return Ok(());
+        }
 
         self.next_turn();
         self.state = GameState::InProgress;
@@ -242,6 +262,7 @@ impl Game {
                 let moves = piece.get_possible_moves(&self.board, &self.turn, &position);
                 let moves = moves
                     .into_iter()
+                    .filter(|p| !self.board.is_pos_check(&!self.turn, &self.get_king_pos(&self.turn), p))
                     .map(|pos| (pos.0.try_into().unwrap(), pos.1.try_into().unwrap()))
                     .collect();
                 Some(moves)
@@ -253,6 +274,7 @@ impl Game {
 
 #[cfg(test)]
 mod lib_test {
+    use crate::board::view_pos;
     use crate::piece::File;
     use crate::piece::Piece;
     use crate::piece::PieceColor;
@@ -295,7 +317,7 @@ mod lib_test {
         let mut board = Board::new(None);
         board.set_piece_at(&(0, 1), PieceColor::White(Piece::Pawn(false)));
         let king_pos = crate::KingPos {
-            black: (4, 0),
+            black: (4, 1),
             white: (4, 7),
         };
         let mut game = Game::new(GameTurn::White, board, king_pos);
@@ -326,6 +348,14 @@ mod lib_test {
         let moves = game.get_possible_moves((Rank::H, File::Seven));
         println!("{game}");
         println!("{moves:?}");
+        view_pos(
+            &moves
+                .clone()
+                .unwrap()
+                .into_iter()
+                .map(|p| (p.0.into(), p.1.into()))
+                .collect::<Vec<(u8, u8)>>(),
+        );
 
         assert_eq!(
             moves,
@@ -336,6 +366,38 @@ mod lib_test {
                 (Rank::H, File::Three),
                 (Rank::H, File::Eight),
                 (Rank::G, File::Seven),
+            ])
+        )
+    }
+
+    #[test]
+    fn rook_move_test_black() {
+        let mut board = Board::default();
+        board.set_piece_at(&(7, 6), PieceColor::Black(Piece::Rook));
+
+        let king_pos = KingPos::default();
+        let game = Game::new(GameTurn::Black, board, king_pos);
+        let moves = game.get_possible_moves((Rank::H, File::Two));
+        println!("{game}");
+        println!("{moves:?}");
+        view_pos(
+            &moves
+                .clone()
+                .unwrap()
+                .into_iter()
+                .map(|p| (p.0.into(), p.1.into()))
+                .collect::<Vec<(u8, u8)>>(),
+        );
+
+        assert_eq!(
+            moves,
+            Some(vec![
+                (Rank::H, File::One),
+                (Rank::H, File::Three),
+                (Rank::H, File::Four),
+                (Rank::H, File::Five),
+                (Rank::H, File::Six),
+                (Rank::G, File::Two),
             ])
         )
     }
@@ -352,11 +414,48 @@ mod lib_test {
         let mut game = Game::new(GameTurn::Black, board, king_pos);
         println!("{}", game);
 
-        let _ = game.make_move((Rank::E, File::Three), (Rank::E, File::Four));
+        let m = game.make_move((Rank::E, File::Three), (Rank::E, File::Four));
 
         println!("{}", game);
+        assert_eq!(m, Ok(()));
+        
+        assert_eq!(game.state, GameState::Check);
 
-        assert_eq!(game.state, GameState::Check)
+        let m = game.make_move((Rank::A, File::Four), (Rank::B, File::Four));
+        println!("{}", game);
+
+        assert_eq!(m, Err(ChessError::InvalidMove));
+        assert_eq!(game.state, GameState::Check);
+    }
+
+    #[test]
+    fn check_block_test() {
+        let mut board = Board::default();
+        board.set_piece_at(&(4, 6), PieceColor::Empty);
+        board.set_piece_at(&(3, 2), PieceColor::Black(Piece::Queen));
+        board.set_piece_at(&(5, 4), PieceColor::White(Piece::Queen));
+        let king_pos = KingPos::default();
+        let mut game = Game::new(GameTurn::Black, board, king_pos);
+        println!("{}", game);
+
+        let m = game.make_move((Rank::D, File::Six), (Rank::E, File::Six));
+        println!("{}", game);
+
+        assert_eq!(m, Ok(()));
+        assert_eq!(game.state, GameState::Check);
+
+        let m = game.make_move((Rank::F, File::Four), (Rank::E, File::Four));
+
+        println!("{}", game);
+        assert_eq!(m, Ok(()));
+        
+        assert_eq!(game.state, GameState::InProgress);
+
+        let m = game.make_move((Rank::E, File::Six), (Rank::E, File::Four));
+        println!("{}", game);
+
+        assert_eq!(m, Ok(()));
+        assert_eq!(game.state, GameState::Check);
     }
 
     #[test]

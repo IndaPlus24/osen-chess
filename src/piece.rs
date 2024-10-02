@@ -244,25 +244,23 @@ impl Piece {
         len: &PieceLen,
     ) -> Vec<(u8, u8)> {
         let moves = move_dirs.map(|dir| add_along_dir(&dir, pos, len));
-        println!("{moves:?}");
+        // println!("{moves:?}");
 
         moves
             .map(|list| {
                 let mut stop = false;
-                let res = list
+                list
                     .into_iter()
                     .map_while(|dir_pos| {
-                        let moves = self.match_along_dir(board, turn, dir_pos);
-                        println!("{:?}", moves);
                         if stop {
                             return None;
                         }
-                        stop = moves.1;
-                        moves.0
+                        let (moves, s) = self.match_along_dir(board, turn, dir_pos);
+                        // println!("{:?}", moves);
+                        stop = s;
+                        moves
                     })
-                    .collect::<Vec<(u8, u8)>>();
-                println!("{res:?}");
-                res
+                    .collect::<Vec<(u8, u8)>>()
             })
             .collect::<Vec<Vec<(u8, u8)>>>()
             .concat()
@@ -321,7 +319,7 @@ fn add_along_dir(dir: &(i8, i8), pos: &(u8, u8), len: &PieceLen) -> Vec<(u8, u8)
     // println!("pos: {:?}", (p_x, p_y));
 
     let (x, y) = dir;
-    println!("dir: {:?}", (x, y));
+    // println!("dir: {:?}", (x, y));
 
     (1..=len)
         .map(|i| (x * i, y * i))
@@ -333,7 +331,7 @@ fn add_along_dir(dir: &(i8, i8), pos: &(u8, u8), len: &PieceLen) -> Vec<(u8, u8)
                 return None;
             }
 
-            println!("{:?}", (r, f));
+            // println!("{:?}", (r, f));
             Some((r.try_into().ok()?, f.try_into().ok()?))
         })
         .collect()

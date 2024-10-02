@@ -23,6 +23,51 @@ impl Board {
         }
     }
 
+    pub(crate) fn is_pos_check(
+        &self,
+        turn: &GameTurn,
+        king_pos: &(u8, u8),
+        pos: &(u8, u8),
+    ) -> bool {
+        if  Piece::Queen
+            .get_possible_moves(self, turn, king_pos)
+            .into_iter()
+            .map(|pos| (self.get_piece_at(&pos), pos))
+            .filter_map(|(p, pos)| match p {
+                PieceColor::White(piece) => match turn {
+                    GameTurn::White => None,
+                    GameTurn::Black => Some((piece, pos)),
+                } ,
+                PieceColor::Black(piece) => match turn {
+                    GameTurn::White => Some((piece, pos)),
+                    GameTurn::Black => None,
+                },
+                PieceColor::Empty => None,
+            })
+            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+            .any(|m| {
+                // println!("{m:?}, king pos: {king_pos:?}");
+                // view_pos(&m);
+                m.contains(pos)
+            })
+        {
+            return true;
+        }
+        Piece::Knight
+            .get_possible_moves(self, !turn, king_pos)
+            .into_iter()
+            .map(|pos| (self.get_piece_at(&pos), pos))
+            .filter_map(|(p, pos)| match p {
+                PieceColor::White(piece) | PieceColor::Black(piece) => match piece {
+                    Piece::Knight => Some((piece, pos)),
+                    _ => None,
+                },
+                PieceColor::Empty => None,
+            })
+            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+            .any(|m| m.contains(pos))
+    }
+
     pub(crate) fn is_check(&self, turn: &GameTurn, king_pos: &(u8, u8)) -> bool {
         println!("Checking... {:?} for {:?}", king_pos, turn);
         let q = Piece::Queen
@@ -36,7 +81,7 @@ impl Board {
             .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
             .any(|m| {
                 println!("{m:?}, king pos: {king_pos:?}");
-                view_pos(&m);
+                // view_pos(&m);
                 m.contains(king_pos)
             });
         if q {
@@ -53,7 +98,7 @@ impl Board {
             .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
             .any(|m| {
                 println!("{m:?}, king pos: {king_pos:?}");
-                view_pos(&m);
+                // view_pos(&m);
                 m.contains(king_pos)
             })
     }
