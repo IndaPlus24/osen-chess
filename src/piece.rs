@@ -19,6 +19,14 @@ impl PieceColor {
         };
         Ok(())
     }
+
+    pub(crate) fn get_piece(&self) -> Result<Piece, ChessError> {
+        match self {
+            PieceColor::White(p) => Ok(*p),
+            PieceColor::Black(p) => Ok(*p),
+            PieceColor::Empty => return Err(ChessError::MismatchedColor),
+        }
+    }
 }
 
 impl Display for PieceColor {
@@ -164,7 +172,19 @@ impl Display for Piece {
 }
 
 impl Piece {
-    fn get_move_set(&self, turn: &GameTurn) -> Vec<(i8, i8)> {
+    pub(crate) fn get_capture_set(&self, turn: &GameTurn) -> Vec<(i8, i8)> {
+        let flip_y = match turn {
+            GameTurn::White => 1,
+            GameTurn::Black => -1,
+        };
+
+        match self {
+            Piece::Pawn(_) => vec![(-1, -flip_y), (1, -flip_y)],
+            _ => panic!("Only use on Pawns"),
+        }
+    }
+
+    pub(crate) fn get_move_set(&self, turn: &GameTurn) -> Vec<(i8, i8)> {
         let flip_y = match turn {
             GameTurn::White => 1,
             GameTurn::Black => -1,
@@ -204,6 +224,7 @@ impl Piece {
         board: &Board,
         turn: &GameTurn,
         pos: &(u8, u8),
+        king_pos: &(u8, u8),
     ) -> Vec<(u8, u8)> {
         let len = match self {
             Piece::Pawn(_) => PieceLen::One,
@@ -232,7 +253,68 @@ impl Piece {
             return moves;
         }
 
-        self.collect_along_dirs(board, turn, move_dirs.into_iter(), pos, &len)
+        let m = self.collect_along_dirs(board, turn, move_dirs.into_iter(), pos, &len);
+
+        m.into_iter()
+            .filter(|new_pos| {
+                let mut test_board = board.clone();
+                let p = match turn {
+                    GameTurn::White => PieceColor::White(self.clone()),
+                    GameTurn::Black => PieceColor::Black(self.clone()),
+                };
+
+                test_board.set_piece_at(pos, PieceColor::Empty);
+                test_board.set_piece_at(new_pos, p);
+                if board.is_check(turn, king_pos) {
+                    return false;
+                }
+                true
+            })
+            .collect::<Vec<(u8, u8)>>()
+    }
+
+    pub(crate) fn collect_along_dirs_lists(
+        &self,
+        board: &Board,
+        turn: &GameTurn,
+        move_dirs: std::vec::IntoIter<(i8, i8)>,
+        pos: &(u8, u8),
+        len: &PieceLen,
+    ) -> Vec<Vec<(u8, u8)>> {
+        let moves = move_dirs.map(|dir| add_along_dir(&dir, pos, len));
+        // println!("{moves:?}");
+        moves
+            .map(|list| {
+                list.into_iter()
+                    .map_while(|dir_pos| {
+                        let moves = self.match_along_dir(board, turn, dir_pos);
+                        // println!("{:?}", moves);
+                        moves
+                    })
+                    .scan(0, |state, p| {
+                        if *state > 0 {
+                            return None;
+                        }
+
+                        let pc = board.get_piece_at(&p);
+
+                        match pc {
+                            PieceColor::White(_piece) => match turn {
+                                GameTurn::White => (),
+                                GameTurn::Black => *state += 1,
+                            },
+                            PieceColor::Black(_piece) => match turn {
+                                GameTurn::White => *state += 1,
+                                GameTurn::Black => (),
+                            },
+                            PieceColor::Empty => (),
+                        }
+
+                        Some(p)
+                    })
+                    .collect::<Vec<(u8, u8)>>()
+            })
+            .collect::<Vec<Vec<(u8, u8)>>>()
     }
 
     pub(crate) fn collect_along_dirs(
@@ -243,26 +325,7 @@ impl Piece {
         pos: &(u8, u8),
         len: &PieceLen,
     ) -> Vec<(u8, u8)> {
-        let moves = move_dirs.map(|dir| add_along_dir(&dir, pos, len));
-        // println!("{moves:?}");
-
-        moves
-            .map(|list| {
-                let mut stop = false;
-                list
-                    .into_iter()
-                    .map_while(|dir_pos| {
-                        if stop {
-                            return None;
-                        }
-                        let (moves, s) = self.match_along_dir(board, turn, dir_pos);
-                        // println!("{:?}", moves);
-                        stop = s;
-                        moves
-                    })
-                    .collect::<Vec<(u8, u8)>>()
-            })
-            .collect::<Vec<Vec<(u8, u8)>>>()
+        self.collect_along_dirs_lists(board, turn, move_dirs, pos, len)
             .concat()
     }
 
@@ -271,17 +334,17 @@ impl Piece {
         board: &Board,
         turn: &GameTurn,
         dir_pos: (u8, u8),
-    ) -> (Option<(u8, u8)>, bool) {
+    ) -> Option<(u8, u8)> {
         match board.get_piece_at(&dir_pos) {
             PieceColor::White(_) => match turn {
-                GameTurn::White => (None, true),
-                GameTurn::Black => (Some(dir_pos), true),
+                GameTurn::White => None,
+                GameTurn::Black => Some(dir_pos),
             },
             PieceColor::Black(_) => match turn {
-                GameTurn::White => (Some(dir_pos), true),
-                GameTurn::Black => (None, true),
+                GameTurn::White => Some(dir_pos),
+                GameTurn::Black => None,
             },
-            PieceColor::Empty => (Some(dir_pos), false),
+            PieceColor::Empty => Some(dir_pos),
         }
     }
 }
@@ -346,10 +409,15 @@ pub(crate) enum PieceLen {
 
 #[cfg(test)]
 mod piece_test {
+    use crate::board::view_pos;
     use crate::board::Board;
+    use crate::piece::File;
     use crate::piece::PieceLen;
+    use crate::piece::Rank;
     use crate::Game;
+    use crate::GameState;
     use crate::GameTurn;
+    use crate::KingPos;
 
     use super::add_along_dir;
     use super::Piece;
@@ -393,7 +461,7 @@ mod piece_test {
         if let PieceColor::White(p) = piece {
             let res = p.match_along_dir(&board, &GameTurn::White, dir_pos);
             println!("{res:?}");
-            assert_eq!(res, (Some(dir_pos), true))
+            assert_eq!(res, Some(dir_pos))
         };
     }
 
@@ -455,5 +523,37 @@ mod piece_test {
             println!("{moves:?}");
             assert_eq!(moves, vec![(5, 4), (7, 4), (6, 4)])
         }
+    }
+
+    #[test]
+    fn rook_cap_test() {
+        let mut board = Board::new(None);
+        let king_pos = KingPos::default();
+        board.set_piece_at(&king_pos.white, PieceColor::White(Piece::King));
+        board.set_piece_at(&king_pos.black, PieceColor::Black(Piece::King));
+        board.set_piece_at(&(4, 1), PieceColor::Black(Piece::Pawn(true)));
+        board.set_piece_at(&(4, 5), PieceColor::White(Piece::Rook));
+        println!("{board}");
+        let q = Piece::Rook.get_possible_moves(&board, &GameTurn::White, &(4, 5), &king_pos.white);
+        println!("{q:?}");
+        view_pos(&q);
+
+        assert_eq!(
+            q,
+            vec![
+                (4, 6),
+                (5, 5),
+                (6, 5),
+                (7, 5),
+                (4, 4),
+                (4, 3),
+                (4, 2),
+                (4, 1),
+                (3, 5),
+                (2, 5),
+                (1, 5),
+                (0, 5)
+            ]
+        )
     }
 }

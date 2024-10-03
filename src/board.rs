@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::piece::File;
 use crate::piece::Piece;
 use crate::piece::PieceColor;
+use crate::piece::PieceLen;
 use crate::piece::Rank;
 use crate::GameState;
 use crate::GameTurn;
@@ -23,85 +24,109 @@ impl Board {
         }
     }
 
-    pub(crate) fn is_pos_check(
+    fn is_type_check(
         &self,
+        move_set: Vec<(i8, i8)>,
         turn: &GameTurn,
         king_pos: &(u8, u8),
-        pos: &(u8, u8),
-    ) -> bool {
-        if  Piece::Queen
-            .get_possible_moves(self, turn, king_pos)
+    ) -> Vec<PieceColor> {
+        Piece::Queen
+            .collect_along_dirs_lists(
+                self,
+                turn,
+                move_set.into_iter(),
+                king_pos,
+                &PieceLen::Infinity,
+            )
             .into_iter()
-            .map(|pos| (self.get_piece_at(&pos), pos))
-            .filter_map(|(p, pos)| match p {
-                PieceColor::White(piece) => match turn {
-                    GameTurn::White => None,
-                    GameTurn::Black => Some((piece, pos)),
-                } ,
-                PieceColor::Black(piece) => match turn {
-                    GameTurn::White => Some((piece, pos)),
-                    GameTurn::Black => None,
-                },
-                PieceColor::Empty => None,
+            .filter_map(|p| {
+                let last = *p.last()?;
+                match self.get_piece_at(&last) {
+                    PieceColor::White(_piece) => match turn {
+                        GameTurn::White => None,
+                        GameTurn::Black => Some(last),
+                    },
+                    PieceColor::Black(_piece) => match turn {
+                        GameTurn::White => Some(last),
+                        GameTurn::Black => None,
+                    },
+                    PieceColor::Empty => None,
+                }
             })
-            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
-            .any(|m| {
-                // println!("{m:?}, king pos: {king_pos:?}");
-                // view_pos(&m);
-                m.contains(pos)
-            })
-        {
-            return true;
-        }
-        Piece::Knight
-            .get_possible_moves(self, !turn, king_pos)
-            .into_iter()
-            .map(|pos| (self.get_piece_at(&pos), pos))
-            .filter_map(|(p, pos)| match p {
-                PieceColor::White(piece) | PieceColor::Black(piece) => match piece {
-                    Piece::Knight => Some((piece, pos)),
-                    _ => None,
-                },
-                PieceColor::Empty => None,
-            })
-            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
-            .any(|m| m.contains(pos))
+            .map(|p| self.get_piece_at(&p))
+            .collect()
     }
 
     pub(crate) fn is_check(&self, turn: &GameTurn, king_pos: &(u8, u8)) -> bool {
-        println!("Checking... {:?} for {:?}", king_pos, turn);
-        let q = Piece::Queen
-            .get_possible_moves(self, !turn, king_pos)
-            .into_iter()
-            .map(|pos| (self.get_piece_at(&pos), pos))
-            .filter_map(|(p, pos)| match p {
-                PieceColor::White(piece) | PieceColor::Black(piece) => Some((piece, pos)),
-                PieceColor::Empty => None,
-            })
-            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
-            .any(|m| {
-                println!("{m:?}, king pos: {king_pos:?}");
-                // view_pos(&m);
-                m.contains(king_pos)
-            });
-        if q {
-            return q;
+        let bishop_moves = Piece::Bishop.get_move_set(turn);
+        let q = self.is_type_check(bishop_moves, turn, king_pos);
+        if q.into_iter().any(|p| matches!(p.get_piece().unwrap(), Piece::Bishop | Piece::Queen)) {
+            return true;
         }
-        Piece::Knight
-            .get_possible_moves(self, !turn, king_pos)
-            .into_iter()
-            .map(|pos| (self.get_piece_at(&pos), pos))
-            .filter_map(|(p, pos)| match p {
-                PieceColor::White(piece) | PieceColor::Black(piece) => Some((piece, pos)),
-                PieceColor::Empty => None,
-            })
-            .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
-            .any(|m| {
-                println!("{m:?}, king pos: {king_pos:?}");
-                // view_pos(&m);
-                m.contains(king_pos)
-            })
+        let rook_moves = Piece::Rook.get_move_set(turn);
+        let q = self.is_type_check(rook_moves, turn, king_pos);
+        if q.into_iter().any(|p| matches!(p.get_piece().unwrap(), Piece::Rook | Piece::Queen)) {
+            return true;
+        }
+        let knight_moves = Piece::Knight.get_move_set(turn);
+        let q = self.is_type_check(knight_moves, turn, king_pos);
+        if q.into_iter().any(|p| matches!(p.get_piece().unwrap(), Piece::Knight)) {
+            return true;
+        }
+        let pawn_moves = Piece::Pawn(true).get_capture_set(!turn);
+        let q = self.is_type_check(pawn_moves, turn, king_pos);
+        if q.into_iter().any(|p| matches!(p.get_piece().unwrap(), Piece::Pawn(_))) {
+            return true;
+        }
+
+        false
+
     }
+
+    // pub(crate) fn is_pos_check(&self, turn: &GameTurn, king_pos: &(u8, u8)) -> bool {
+    //     println!("Checking... {:?} for {:?}", king_pos, turn);
+    //     let q = Piece::Queen
+    //         .get_possible_moves(self, !turn, king_pos)
+    //         .into_iter()
+    //         .map(|pos| (self.get_piece_at(&pos), pos))
+    //         .filter_map(|(p, pos)| match p {
+    //             PieceColor::White(piece) => match turn {
+    //                 GameTurn::White => None,
+    //                 GameTurn::Black => Some((piece, pos)),
+    //             },
+    //             PieceColor::Black(piece) => match turn {
+    //                 GameTurn::White => Some((piece, pos)),
+    //                 GameTurn::Black => None,
+    //             },
+    //             PieceColor::Empty => None,
+    //         })
+    //         .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+    //         .any(|m| {
+    //             println!("{m:?}, king pos: {king_pos:?}");
+    //             // view_pos(&m);
+    //             m.contains(king_pos)
+    //         });
+    //     if q {
+    //         return q;
+    //     }
+    //     Piece::Knight
+    //         .get_possible_moves(self, !turn, king_pos)
+    //         .into_iter()
+    //         .map(|pos| (self.get_piece_at(&pos), pos))
+    //         .filter_map(|(p, pos)| match p {
+    //             PieceColor::White(piece) | PieceColor::Black(piece) => match piece {
+    //                 Piece::Knight => Some((piece, pos)),
+    //                 _ => None,
+    //             },
+    //             PieceColor::Empty => None,
+    //         })
+    //         .map(|(p, pos)| p.get_possible_moves(self, turn, &pos))
+    //         .any(|m| {
+    //             println!("{m:?}, king pos: {king_pos:?}");
+    //             // view_pos(&m);
+    //             m.contains(king_pos)
+    //         })
+    // }
 
     pub(crate) fn get_piece_at(&self, pos: &(u8, u8)) -> PieceColor {
         let (x, y) = pos;
